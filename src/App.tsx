@@ -209,6 +209,79 @@ function App() {
     }
   }, [params, isManualMode]);
 
+  // Synchronize headcount parameters with the collaborators list (even in manual mode)
+  useEffect(() => {
+    if (colaboradores.length === 0) return;
+
+    const t1Colabs = colaboradores.filter(c => c.turno === 'T1');
+    const t2Colabs = colaboradores.filter(c => c.turno === 'T2');
+    const t3Colabs = colaboradores.filter(c => c.turno === 'T3');
+
+    const diffT1 = params.conferentesT1 - t1Colabs.length;
+    const diffT2 = params.conferentesT2 - t2Colabs.length;
+    const diffT3 = params.conferentesT3 - t3Colabs.length;
+
+    if (diffT1 === 0 && diffT2 === 0 && diffT3 === 0) return;
+
+    let updated = [...colaboradores];
+    const dias = (params.month !== undefined && params.year !== undefined)
+      ? new Date(params.year, params.month + 1, 0).getDate()
+      : params.dias;
+
+    // Adjust T1
+    if (diffT1 < 0) {
+      const toRemove = t1Colabs.slice(diffT1);
+      const idsToRemove = new Set(toRemove.map(c => c.id));
+      updated = updated.filter(c => !idsToRemove.has(c.id));
+    } else if (diffT1 > 0) {
+      for (let i = 0; i < diffT1; i++) {
+        const nextNum = t1Colabs.length + i + 1;
+        const newId = `T1-${String(nextNum).padStart(3, '0')}`;
+        updated.push({
+          id: newId,
+          turno: 'T1',
+          escala: Array(dias).fill('WORK' as DayStatus)
+        });
+      }
+    }
+
+    // Adjust T2
+    if (diffT2 < 0) {
+      const toRemove = t2Colabs.slice(diffT2);
+      const idsToRemove = new Set(toRemove.map(c => c.id));
+      updated = updated.filter(c => !idsToRemove.has(c.id));
+    } else if (diffT2 > 0) {
+      for (let i = 0; i < diffT2; i++) {
+        const nextNum = t2Colabs.length + i + 1;
+        const newId = `T2-${String(nextNum).padStart(3, '0')}`;
+        updated.push({
+          id: newId,
+          turno: 'T2',
+          escala: Array(dias).fill('WORK' as DayStatus)
+        });
+      }
+    }
+
+    // Adjust T3
+    if (diffT3 < 0) {
+      const toRemove = t3Colabs.slice(diffT3);
+      const idsToRemove = new Set(toRemove.map(c => c.id));
+      updated = updated.filter(c => !idsToRemove.has(c.id));
+    } else if (diffT3 > 0) {
+      for (let i = 0; i < diffT3; i++) {
+        const nextNum = t3Colabs.length + i + 1;
+        const newId = `T3-${String(nextNum).padStart(3, '0')}`;
+        updated.push({
+          id: newId,
+          turno: 'T3',
+          escala: Array(dias).fill('WORK' as DayStatus)
+        });
+      }
+    }
+
+    setColaboradores(updated);
+  }, [params.conferentesT1, params.conferentesT2, params.conferentesT3]);
+
   // Save schedule per month/year so changes persist when navigating between months
   useEffect(() => {
     if (params.month !== prevMonthYear.month || params.year !== prevMonthYear.year) {

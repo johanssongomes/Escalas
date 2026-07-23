@@ -159,13 +159,13 @@ const TeamRow: React.FC<TeamRowProps> = ({ team, maxTotal, usedByOthers, onChang
               <input
                 type="number"
                 min={0}
-                max={maxCount + team.memberCount}
+                max={maxCount}
                 value={draft.memberCount}
-                onChange={e => setDraft(d => ({ ...d, memberCount: Math.max(0, parseInt(e.target.value) || 0) }))}
+                onChange={e => setDraft(d => ({ ...d, memberCount: Math.max(0, Math.min(parseInt(e.target.value) || 0, maxCount)) }))}
                 className="w-14 text-center text-sm font-extrabold bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg py-1 focus:ring-1 focus:ring-blue-500 text-slate-800 dark:text-slate-200"
               />
               <button
-                onClick={() => setDraft(d => ({ ...d, memberCount: Math.min(d.memberCount + 1, maxCount + team.memberCount) }))}
+                onClick={() => setDraft(d => ({ ...d, memberCount: Math.min(d.memberCount + 1, maxCount) }))}
                 className="w-7 h-7 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 font-black text-slate-600 hover:bg-slate-100 transition cursor-pointer flex items-center justify-center"
               >+</button>
               <span className="text-[10px] text-slate-400 ml-1">/ {maxTotal} total</span>
@@ -311,7 +311,7 @@ const AddTeamForm: React.FC<AddTeamFormProps> = ({ shift, remaining, onAdd, onCa
               min={0}
               max={remaining}
               value={count}
-              onChange={e => setCount(Math.max(0, parseInt(e.target.value) || 0))}
+              onChange={e => setCount(Math.max(0, Math.min(parseInt(e.target.value) || 0, remaining)))}
               className="w-14 text-center text-sm font-extrabold bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg py-1 focus:ring-1 focus:ring-blue-500 text-slate-800 dark:text-slate-200"
             />
             <button onClick={() => setCount(c => Math.min(c + 1, remaining))} className="w-7 h-7 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 font-black text-slate-600 hover:bg-slate-100 transition cursor-pointer flex items-center justify-center">+</button>

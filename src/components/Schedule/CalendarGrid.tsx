@@ -90,20 +90,22 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
   });
 
   const capacityStats = useMemo(() => {
-    const baseT1 = params?.conferentesT1 ?? 0;
-    const baseT2 = params?.conferentesT2 ?? 0;
-    const baseT3 = params?.conferentesT3 ?? 0;
+    const baseT1 = selectedShifts.includes('T1') ? (params?.conferentesT1 ?? 0) : 0;
+    const baseT2 = selectedShifts.includes('T2') ? (params?.conferentesT2 ?? 0) : 0;
+    const baseT3 = selectedShifts.includes('T3') ? (params?.conferentesT3 ?? 0) : 0;
     const baseHC = baseT1 + baseT2 + baseT3;
     
     const capacidadeTeorica = baseHC * prodRate * diasCount;
 
     let totalWorkDays = 0;
     colaboradores.forEach(c => {
-      c.escala.forEach(status => {
-        if (status === 'WORK') {
-          totalWorkDays++;
-        }
-      });
+      if (selectedShifts.includes(c.turno)) {
+        c.escala.forEach(status => {
+          if (status === 'WORK') {
+            totalWorkDays++;
+          }
+        });
+      }
     });
     const capacidadeReal = totalWorkDays * prodRate;
 
@@ -116,7 +118,30 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
       capacidadeReal,
       perdaCapacidade: Math.round(perdaCapacidade * 10) / 10
     };
-  }, [colaboradores, params, prodRate, diasCount]);
+  }, [colaboradores, params, prodRate, diasCount, selectedShifts]);
+
+  const shiftStats = useMemo(() => {
+    const stats: Record<string, { worked: number; off: number; count: number }> = {
+      T1: { worked: 0, off: 0, count: 0 },
+      T2: { worked: 0, off: 0, count: 0 },
+      T3: { worked: 0, off: 0, count: 0 },
+    };
+
+    colaboradores.forEach(c => {
+      if (stats[c.turno]) {
+        stats[c.turno].count++;
+        c.escala.forEach(status => {
+          if (status === 'WORK') {
+            stats[c.turno].worked++;
+          } else {
+            stats[c.turno].off++;
+          }
+        });
+      }
+    });
+
+    return stats;
+  }, [colaboradores]);
 
   const toggleShift = (shift: string) => {
     if (selectedShifts.includes(shift)) {
@@ -527,9 +552,30 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
               <span className="text-3xl font-black text-blue-600 dark:text-blue-400">{capacityStats.capacidadeReal.toLocaleString('pt-BR')}</span>
               <span className="text-xs font-bold text-blue-400">m³</span>
             </div>
+
+            {/* Worked and Off Days Breakdown */}
+            <div className="mt-3 pt-2.5 border-t border-slate-100 dark:border-slate-800/80 space-y-2 text-[9.5px]">
+              {selectedShifts.map(shift => {
+                const data = shiftStats[shift];
+                if (!data || data.count === 0) return null;
+                const avgWorked = (data.worked / data.count).toFixed(1);
+                const avgOff = (data.off / data.count).toFixed(1);
+                return (
+                  <div key={shift} className="flex flex-col text-slate-500 dark:text-slate-400">
+                    <div className="flex justify-between font-bold">
+                      <span className="text-slate-700 dark:text-slate-350">{shift === 'T1' ? '1º Turno' : shift === 'T2' ? '2º Turno' : '3º Turno'}:</span>
+                      <span className="text-slate-800 dark:text-slate-200">{data.worked} prod. / {data.off} perdas</span>
+                    </div>
+                    <div className="text-[8px] text-slate-400 text-right">
+                      (Média: {avgWorked} prod. | {avgOff} perdas por colab.)
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
-          <div className="flex items-center gap-1.5 text-[10px] text-emerald-600 dark:text-emerald-400 font-bold mt-4">
-            <CheckCircle2 className="w-3.5 h-3.5" />
+          <div className="flex items-center gap-1.5 text-[9px] text-emerald-600 dark:text-emerald-400 font-bold mt-4 pt-2 border-t border-slate-100 dark:border-slate-800/50">
+            <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
             <span>Capacidade real de atendimento</span>
           </div>
         </div>
