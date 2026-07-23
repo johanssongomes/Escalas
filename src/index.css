@@ -1,0 +1,58 @@
+@import "tailwindcss";
+
+@variant dark (&:where(.dark, .dark *));
+
+@layer base {
+  body {
+    @apply bg-slate-50 text-slate-800 dark:bg-slate-950 dark:text-slate-100 antialiased font-sans transition-colors duration-200;
+  }
+}
+
+/* Animations */
+.animate-spin-slow {
+  animation: spin 8s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Magalu Glassmorphism & Custom styles */
+.magalu-header {
+  background: linear-gradient(135deg, #0086ff 0%, #0056b3 100%);
+}
+
+.magalog-gradient {
+  background: linear-gradient(135deg, #ff5a00 0%, #d04800 100%);
+}
+
+/* Print CSS Styles */
+@media print {
+  body {
+    background: white !important;
+    color: black !important;
+  }
+  .noprint {
+    display: none !important;
+  }
+  .print-break-after {
+    page-break-after: always;
+  }
+  .print-no-break {
+    page-break-inside: avoid;
+  }
+  table, tr, td, th {
+    border-color: #cbd5e1 !important;
+    color: black !important;
+    background: transparent !important;
+  }
+  /* Remove scrollbars and fits to print */
+  .overflow-x-auto {
+    overflow-x: visible !important;
+  }
+}
