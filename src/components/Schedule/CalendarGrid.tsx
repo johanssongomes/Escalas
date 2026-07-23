@@ -289,7 +289,7 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
       <div className={plain ? "w-full overflow-hidden" : "bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-4 shadow-sm mb-8 overflow-hidden"}>
       <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4 mb-4 pb-4 border-b border-slate-100 dark:border-slate-800/60">
         {!plain ? (
-          <div className="flex items-center gap-2">
+          <div className="sticky left-3 z-10 flex items-center gap-2">
             <Calendar className="w-5 h-5 text-slate-600" />
             <div>
               <h2 className="text-base font-black text-slate-800 dark:text-slate-100">
@@ -299,7 +299,7 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
             </div>
           </div>
         ) : (
-          <div className="flex items-center gap-2">
+          <div className="sticky left-3 z-10 flex items-center gap-2">
             <Calendar className="w-4 h-4 text-blue-500" />
             <span className="font-extrabold text-sm text-slate-700 dark:text-slate-200">Grade da Escala Consolidada</span>
           </div>
@@ -400,7 +400,7 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
           {/* Row 2: Filtering and Legend */}
           <div className="flex flex-wrap items-center justify-between gap-4 w-full pt-1">
             {/* Shift Filter */}
-            <div className="flex items-center gap-2">
+            <div className="sticky left-3 z-10 flex items-center gap-2">
               <span className="text-[10px] font-black text-slate-500 flex items-center gap-1 uppercase tracking-wider">
                 <Filter className="w-3.5 h-3.5 text-slate-400" />
                 Filtrar Turno:
@@ -547,8 +547,8 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
                       onClick={() => toggleGroupCollapse(group.key)}
                       className="bg-slate-50/50 dark:bg-slate-900/30 text-[9px] font-extrabold text-slate-600 dark:text-slate-300 hover:bg-slate-100/60 dark:hover:bg-slate-900/60 transition cursor-pointer select-none"
                     >
-                      <td colSpan={diasCount + 2} className="p-1.5 px-3 border-y border-slate-200/60 dark:border-slate-800/80 sticky left-0 z-10">
-                        <div className="flex items-center gap-2">
+                      <td colSpan={diasCount + 2} className="p-1.5 px-3 border-y border-slate-200/60 dark:border-slate-800/80 ">
+                        <div className="sticky left-3 z-10 flex items-center gap-2">
                           {isCollapsed ? (
                             <ChevronRight className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                           ) : (
@@ -579,8 +579,8 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
               <>
                 {/* Visual Shift Header */}
                 <tr className="bg-slate-50 dark:bg-slate-950 text-[9px] font-extrabold border-t-2 border-slate-200 dark:border-slate-800">
-                  <td colSpan={diasCount + 2} className="p-1 px-3 text-white sticky left-0 z-10 bg-emerald-600 dark:bg-emerald-700 border-l-4 border-slate-800 shadow-sm">
-                    PAINEL DE TOTAIS: 1º TURNO (T1)
+                  <td colSpan={diasCount + 2} className="p-1 px-3 text-white  bg-emerald-600 dark:bg-emerald-700 border-l-4 border-slate-800 shadow-sm">
+                    <span className="sticky left-3 z-10 inline-block"><span className="sticky left-3 z-10 inline-block">PAINEL DE TOTAIS: 1º TURNO (T1)</span></span>
                   </td>
                 </tr>
                 <tr className="hover:bg-slate-50/50 transition">
@@ -788,8 +788,8 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
               <>
                 {/* Visual Shift Header */}
                 <tr className="bg-slate-50 dark:bg-slate-950 text-[9px] font-extrabold border-t-2 border-slate-200 dark:border-slate-800">
-                  <td colSpan={diasCount + 2} className="p-1 px-3 text-white sticky left-0 z-10 bg-amber-600 dark:bg-amber-700 border-l-4 border-slate-800 shadow-sm">
-                    PAINEL DE TOTAIS: 2º TURNO (T2)
+                  <td colSpan={diasCount + 2} className="p-1 px-3 text-white  bg-amber-600 dark:bg-amber-700 border-l-4 border-slate-800 shadow-sm">
+                    <span className="sticky left-3 z-10 inline-block"><span className="sticky left-3 z-10 inline-block">PAINEL DE TOTAIS: 2º TURNO (T2)</span></span>
                   </td>
                 </tr>
                 <tr className="hover:bg-slate-50/50 transition">
@@ -997,8 +997,8 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
               <>
                 {/* Visual Shift Header */}
                 <tr className="bg-slate-50 dark:bg-slate-950 text-[9px] font-extrabold border-t-2 border-slate-200 dark:border-slate-800">
-                  <td colSpan={diasCount + 2} className="p-1 px-3 text-white sticky left-0 z-10 bg-indigo-600 dark:bg-indigo-700 border-l-4 border-slate-800 shadow-sm animate-none">
-                    PAINEL DE TOTAIS: 3º TURNO (T3)
+                  <td colSpan={diasCount + 2} className="p-1 px-3 text-white  bg-indigo-600 dark:bg-indigo-700 border-l-4 border-slate-800 shadow-sm animate-none">
+                    <span className="sticky left-3 z-10 inline-block"><span className="sticky left-3 z-10 inline-block">PAINEL DE TOTAIS: 3º TURNO (T3)</span></span>
                   </td>
                 </tr>
                 <tr className="hover:bg-slate-50/50 transition">
@@ -1206,188 +1206,8 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
               <>
                 {/* Visual Shift Header */}
                 <tr className="bg-slate-50 dark:bg-slate-950 text-[9px] font-extrabold border-t-2 border-slate-200 dark:border-slate-800">
-                  <td colSpan={diasCount + 2} className="p-1 px-3 text-white sticky left-0 z-10 bg-slate-700 dark:bg-slate-800 border-l-4 border-slate-800 shadow-sm animate-none">
-                    CONSOLIDADO GERAL (TODOS OS TURNOS)
-                  </td>
-                </tr>
-                <tr className="hover:bg-slate-50/50 transition">
-                  <td className="p-1 sticky left-0 z-20 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 font-bold text-[9px] shadow-sm text-slate-700 dark:text-slate-300">
-                    Ativos Geral
-                  </td>
-                  {Array.from({ length: diasCount }).map((_, d) => {
-                    const count = colaboradores.filter(c => selectedShifts.includes(c.turno) && c.escala[d] === 'WORK').length;
-                    const isSun = d % 7 === 6;
-                    return (
-                      <td
-                        key={d}
-                        className={`p-0.5 text-center text-[9px] font-black text-slate-700 dark:text-slate-300 ${
-                          isSun 
-                            ? 'border-r-2 border-slate-300 dark:border-slate-700' 
-                            : 'border-r border-slate-200 dark:border-slate-800'
-                        }`}
-                      >
-                        {count}
-                      </td>
-                    );
-                  })}
-                  {/* Summary Cell */}
-                  <td className="p-0.5 text-center text-[9px] font-bold bg-slate-50/40 dark:bg-slate-900/20 border-l border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300">
-                    <div className="flex flex-col items-center">
-                      <span>{Math.round(Array.from({ length: diasCount }).map((_, d) => colaboradores.filter(c => selectedShifts.includes(c.turno) && c.escala[d] === 'WORK').length).reduce((a, b) => a + b, 0) / diasCount)}</span>
-                      <span className="text-[6.5px] text-slate-400 font-normal">Média</span>
-                    </div>
-                  </td>
-                </tr>
-                <tr className="hover:bg-slate-50/50 transition">
-                  <td className="p-1 sticky left-0 z-20 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 font-bold text-[9px] shadow-sm text-slate-700 dark:text-slate-300">
-                    Capac. Geral
-                  </td>
-                  {Array.from({ length: diasCount }).map((_, d) => {
-                    const count = colaboradores.filter(c => selectedShifts.includes(c.turno) && c.escala[d] === 'WORK').length;
-                    const isSun = d % 7 === 6;
-                    return (
-                      <td
-                        key={d}
-                        className={`p-0.5 text-center text-[9px] font-black text-slate-700 dark:text-slate-300 ${
-                          isSun 
-                            ? 'border-r-2 border-slate-300 dark:border-slate-700' 
-                            : 'border-r border-slate-200 dark:border-slate-800'
-                        }`}
-                      >
-                        {count * prodRate}
-                      </td>
-                    );
-                  })}
-                  {/* Summary Cell */}
-                  <td className="p-0.5 text-center text-[9px] font-bold bg-slate-50/40 dark:bg-slate-900/20 border-l border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300">
-                    <div className="flex flex-col items-center">
-                      <span>{(Array.from({ length: diasCount }).map((_, d) => colaboradores.filter(c => selectedShifts.includes(c.turno) && c.escala[d] === 'WORK').length * prodRate).reduce((a, b) => a + b, 0)).toLocaleString('pt-BR')}</span>
-                      <span className="text-[6.5px] text-slate-400 font-normal">TT</span>
-                    </div>
-                  </td>
-                </tr>
-                <tr className="hover:bg-slate-50/50 transition">
-                  <td className="p-1 sticky left-0 z-20 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 font-bold text-[9px] shadow-sm text-slate-700 dark:text-slate-300">
-                    Demand. Geral
-                  </td>
-                  {Array.from({ length: diasCount }).map((_, d) => {
-                    let totalDemand = 0;
-                    selectedShifts.forEach(s => {
-                      totalDemand += (demandaDiaria[s] && demandaDiaria[s][d]) || 0;
-                    });
-                    const isSun = d % 7 === 6;
-                    return (
-                      <td
-                        key={d}
-                        className={`p-0.5 text-center text-[9px] font-black text-slate-700 dark:text-slate-300 ${
-                  {Array.from({ length: diasCount }).map((_, d) => {
-                    const count = colaboradores.filter(c => selectedShifts.includes(c.turno) && c.escala[d] === 'WORK').length;
-                    const cap = count * prodRate;
-                    let totalDemand = 0;
-                    selectedShifts.forEach(s => {
-                      totalDemand += (demandaDiaria[s] && demandaDiaria[s][d]) || 0;
-                    });
-                    const diff = cap - totalDemand;
-                    const isSun = d % 7 === 6;
-                    return (
-                      <td
-                        key={d}
-                        className={`p-0.5 text-center text-[9px] font-black ${
-                          isSun 
-                            ? 'border-r-2 border-slate-300 dark:border-slate-700' 
-                            : 'border-r border-slate-200 dark:border-slate-800'
-                        } ${diff >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500 dark:text-red-400'}`}
-                      >
-                        {diff > 0 ? `+${diff}` : diff}
-                      </td>
-                    );
-                  })}
-                  {/* Summary Cell */}
-                  <td className="p-0.5 text-center text-[9px] font-bold bg-slate-50/40 dark:bg-slate-900/20 border-l border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300">
-                    <div className="flex flex-col items-center">
-                      {(() => {
-                        const totalCap = Array.from({ length: diasCount }).map((_, d) => colaboradores.filter(c => selectedShifts.includes(c.turno) && c.escala[d] === 'WORK').length * prodRate).reduce((a, b) => a + b, 0);
-                        let grandDemand = 0;
-                        for (let d = 0; d < 28; d++) {
-                          selectedShifts.forEach(s => {
-                            grandDemand += (demandaDiaria[s] && demandaDiaria[s][d]) || 0;
-                          });
-                        }
-                        const totalSal = totalCap - grandDemand;
-                        return (
-                          <>
-                            <span className={totalSal >= 0 ? 'text-emerald-600 dark:text-emerald-450' : 'text-red-550 dark:text-red-455'}>
-                              {totalSal > 0 ? `+${totalSal.toLocaleString('pt-BR')}` : totalSal.toLocaleString('pt-BR')}
-                            </span>
-                            <span className="text-[6.5px] text-slate-400 font-normal">SL TT</span>
-                          </>
-                        );
-                      })()}
-                    </div>
-                  </td>
-                </tr>
-                {/* HC +/- Row */}
-                <tr className="bg-slate-50/20 dark:bg-slate-900/20 font-black border-b border-slate-300 dark:border-slate-700 transition">
-                  <td className="p-1 sticky left-0 z-20 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 font-bold text-[9px] shadow-sm text-slate-700 dark:text-slate-300">
-                    Hc +/- Geral
-                  </td>
-                  {Array.from({ length: diasCount }).map((_, d) => {
-                    const count = colaboradores.filter(c => selectedShifts.includes(c.turno) && c.escala[d] === 'WORK').length;
-                    const cap = count * prodRate;
-                    let totalDemand = 0;
-                    selectedShifts.forEach(s => {
-                      totalDemand += (demandaDiaria[s] && demandaDiaria[s][d]) || 0;
-                    });
-                    const diff = cap - totalDemand;
-                    const hcDiff = Math.round(diff / prodRate);
-                    const isSun = d % 7 === 6;
-                    return (
-                      <td
-                        key={d}
-                        className={`p-0.5 text-center text-[9px] font-black ${
-                          isSun 
-                            ? 'border-r-2 border-slate-300 dark:border-slate-700 bg-slate-50/50' 
-                            : 'border-r border-slate-200 dark:border-slate-800 bg-slate-50/50'
-                        } ${hcDiff >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500 dark:text-red-400'}`}
-                      >
-                        {hcDiff > 0 ? `+${hcDiff}` : hcDiff}
-                      </td>
-                    );
-                  })}
-                        {hcDiff > 0 ? `+${hcDiff}` : hcDiff}
-                      </td>
-                    );
-                  })}
-                  {/* Summary Cell */}
-                  <td className="p-0.5 text-center text-[9px] font-bold bg-slate-50/40 dark:bg-slate-900/20 border-l border-slate-200 dark:border-slate-800 text-slate-750 dark:text-slate-300">
-                    <div className="flex flex-col items-center">
-                      {(() => {
-                        const totalCap = Array.from({ length: diasCount }).map((_, d) => colaboradores.filter(c => c.turno === 'T3' && c.escala[d] === 'WORK').length * prodRate).reduce((a, b) => a + b, 0);
-                        const totalDem = (demandaDiaria['T3'] || []).reduce((a, b) => a + b, 0);
-                        const totalSal = totalCap - totalDem;
-                        const avgHc = Math.round((totalSal / prodRate / diasCount) * 10) / 10;
-                        return (
-                          <>
-                            <span className={avgHc >= 0 ? 'text-emerald-600 dark:text-emerald-450' : 'text-red-500 dark:text-red-455'}>
-                              {avgHc > 0 ? `+${avgHc}` : avgHc}
-                            </span>
-                            <span className="text-[6.5px] text-slate-400 font-normal">Média</span>
-                          </>
-                        );
-                      })()}
-                    </div>
-                  </td>
-                </tr>
-              </>
-            )}
-
-            {/* Total Geral Summary Group */}
-            {selectedShifts.length > 1 && (
-              <>
-                {/* Visual Shift Header */}
-                <tr className="bg-slate-50 dark:bg-slate-950 text-[9px] font-extrabold border-t-2 border-slate-200 dark:border-slate-800">
-                  <td colSpan={diasCount + 2} className="p-1 px-3 text-white sticky left-0 z-10 bg-slate-700 dark:bg-slate-800 border-l-4 border-slate-800 shadow-sm animate-none">
-                    CONSOLIDADO GERAL (TODOS OS TURNOS)
+                  <td colSpan={diasCount + 2} className="p-1 px-3 text-white  bg-slate-700 dark:bg-slate-800 border-l-4 border-slate-800 shadow-sm animate-none">
+                    <span className="sticky left-3 z-10 inline-block"><span className="sticky left-3 z-10 inline-block">CONSOLIDADO GERAL (TODOS OS TURNOS)</span></span>
                   </td>
                 </tr>
                 <tr className="hover:bg-slate-50/50 transition">
@@ -1496,7 +1316,7 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
                           isSun 
                             ? 'border-r-2 border-slate-300 dark:border-slate-700' 
                             : 'border-r border-slate-200 dark:border-slate-800'
-                        } ${diff >= 0 ? 'text-emerald-600 dark:text-emerald-450' : 'text-red-500 dark:text-red-400'}`}
+                        } ${diff >= 0 ? 'text-emerald-600 dark:text-emerald-450' : 'text-red-550 dark:text-red-455'}`}
                       >
                         {diff > 0 ? `+${diff}` : diff}
                       </td>
@@ -1548,7 +1368,7 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
                           isSun 
                             ? 'border-r-2 border-slate-300 dark:border-slate-700 bg-slate-50/50' 
                             : 'border-r border-slate-200 dark:border-slate-800 bg-slate-50/50'
-                        } ${hcDiff >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500 dark:text-red-400'}`}
+                        } ${hcDiff >= 0 ? 'text-emerald-600 dark:text-emerald-450' : 'text-red-550 dark:text-red-455'}`}
                       >
                         {hcDiff > 0 ? `+${hcDiff}` : hcDiff}
                       </td>
