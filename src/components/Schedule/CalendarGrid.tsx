@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import type { Colaborador, ScheduleParams, TeamConfig } from '../../types';
-import { Calendar, User, Filter, Layers, ChevronDown, ChevronRight, ChevronsUpDown, BarChart, Settings2 } from 'lucide-react';
+import { Calendar, User, Filter, Layers, ChevronDown, ChevronRight, ChevronsUpDown, Settings2, Calculator, CheckCircle2, TrendingDown } from 'lucide-react';
 import { TeamManagerModal } from './TeamManagerModal';
 
 interface CalendarGridProps {
@@ -88,6 +88,35 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
       T3: Array(28).fill(0)
     };
   });
+
+  const capacityStats = useMemo(() => {
+    const baseT1 = params?.conferentesT1 ?? 0;
+    const baseT2 = params?.conferentesT2 ?? 0;
+    const baseT3 = params?.conferentesT3 ?? 0;
+    const baseHC = baseT1 + baseT2 + baseT3;
+    
+    const capacidadeTeorica = baseHC * prodRate * diasCount;
+
+    let totalWorkDays = 0;
+    colaboradores.forEach(c => {
+      c.escala.forEach(status => {
+        if (status === 'WORK') {
+          totalWorkDays++;
+        }
+      });
+    });
+    const capacidadeReal = totalWorkDays * prodRate;
+
+    const perdaCapacidade = capacidadeTeorica > 0 
+      ? ((capacidadeReal - capacidadeTeorica) / capacidadeTeorica) * 100 
+      : 0;
+
+    return {
+      capacidadeTeorica,
+      capacidadeReal,
+      perdaCapacidade: Math.round(perdaCapacidade * 10) / 10
+    };
+  }, [colaboradores, params, prodRate, diasCount]);
 
   const toggleShift = (shift: string) => {
     if (selectedShifts.includes(shift)) {
@@ -308,20 +337,6 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
         <div className="flex flex-wrap items-center gap-4 text-[10px] font-bold">
           <div className="flex flex-wrap items-center justify-between gap-4 w-full border-b border-slate-100 dark:border-slate-800/40 pb-3 mb-1">
             <div className="flex flex-wrap items-center gap-4">
-              {/* Metas */}
-              <div className="flex items-center gap-1.5 bg-slate-50 dark:bg-slate-900/50 px-2 py-1 rounded-xl border border-slate-200/60 dark:border-slate-800">
-                <span className="text-[10px] font-black text-slate-500 flex items-center gap-1 uppercase tracking-wider">
-                  <BarChart className="w-3.5 h-3.5 text-slate-400" />
-                  Metas:
-                </span>
-                <input
-                  type="number"
-                  value={prodRate}
-                  onChange={(e) => setProdRate(Math.max(1, parseInt(e.target.value) || 0))}
-                  className="w-12 text-center text-xs font-black bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-850 rounded-lg py-0.5 focus:ring-1 focus:ring-slate-500"
-                />
-                <span className="text-slate-400 text-[10px] font-bold">m³/colab</span>
-              </div>
 
               {/* View Mode Toggle */}
               <div className="flex items-center gap-1.5 bg-slate-50 dark:bg-slate-900/50 px-2 py-1 rounded-xl border border-slate-200/60 dark:border-slate-800">
@@ -460,6 +475,77 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
               </div>
             </div>
           </div>
+        </div>
+      </div>
+
+
+      {/* Painel de Capacidade & Produtividade */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6 noprint">
+        {/* Card 1: Meta de Produtividade */}
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-5 shadow-sm flex flex-col justify-between">
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <span className="p-1 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                <Calculator className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+              </span>
+              <h4 className="text-xs font-bold text-slate-700 dark:text-slate-200">Meta de Produtividade</h4>
+            </div>
+            <p className="text-[10px] text-slate-400 leading-tight">
+              Ajuste o volume processado por conferente por dia
+            </p>
+          </div>
+          <div className="flex items-center gap-3 mt-4">
+            <input
+              type="number"
+              value={prodRate}
+              onChange={(e) => setProdRate(Math.max(1, parseInt(e.target.value) || 0))}
+              className="w-20 text-lg font-black text-slate-800 dark:text-slate-100 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-2 py-1.5 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 text-center"
+            />
+            <span className="text-slate-500 dark:text-slate-400 font-extrabold text-[11px]">m³/dia</span>
+          </div>
+        </div>
+
+        {/* Card 2: Capacidade Teórica */}
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-5 shadow-sm flex flex-col justify-between">
+          <div>
+            <h5 className="text-[9px] font-black text-slate-450 dark:text-slate-555 uppercase tracking-wider">Capacidade Teórica</h5>
+            <div className="flex items-baseline gap-1 mt-3">
+              <span className="text-3xl font-black text-slate-800 dark:text-slate-100">{capacityStats.capacidadeTeorica.toLocaleString('pt-BR')}</span>
+              <span className="text-xs font-bold text-slate-400">m³</span>
+            </div>
+          </div>
+          <p className="text-[10px] text-slate-400 mt-4">
+            Sem considerar folgas da escala
+          </p>
+        </div>
+
+        {/* Card 3: Capacidade com Folgas */}
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-5 shadow-sm flex flex-col justify-between">
+          <div>
+            <h5 className="text-[9px] font-black text-slate-450 dark:text-slate-555 uppercase tracking-wider">Capacidade com Folgas</h5>
+            <div className="flex items-baseline gap-1 mt-3">
+              <span className="text-3xl font-black text-blue-600 dark:text-blue-400">{capacityStats.capacidadeReal.toLocaleString('pt-BR')}</span>
+              <span className="text-xs font-bold text-blue-400">m³</span>
+            </div>
+          </div>
+          <div className="flex items-center gap-1.5 text-[10px] text-emerald-600 dark:text-emerald-400 font-bold mt-4">
+            <CheckCircle2 className="w-3.5 h-3.5" />
+            <span>Capacidade real de atendimento</span>
+          </div>
+        </div>
+
+        {/* Card 4: Perda de Capacidade */}
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-5 shadow-sm flex flex-col justify-between">
+          <div>
+            <h5 className="text-[9px] font-black text-slate-450 dark:text-slate-555 uppercase tracking-wider">Perda de Capacidade</h5>
+            <div className="flex items-baseline gap-1.5 mt-3">
+              <span className="text-3xl font-black text-orange-500 dark:text-orange-400">{capacityStats.perdaCapacidade}%</span>
+              <TrendingDown className="w-4 h-4 text-orange-500 dark:text-orange-400 self-center" />
+            </div>
+          </div>
+          <p className="text-[10px] text-slate-400 mt-4">
+            Redução operacional devido à escala 5x2
+          </p>
         </div>
       </div>
 
