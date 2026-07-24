@@ -150,13 +150,19 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
     const baseT2 = selectedShifts.includes('T2') ? (params?.conferentesT2 ?? 0) : 0;
     const baseT3 = selectedShifts.includes('T3') ? (params?.conferentesT3 ?? 0) : 0;
     const baseHC = baseT1 + baseT2 + baseT3;
-    
-    const capacidadeTeorica = baseHC * prodRate * diasCount;
+
+    // Use the actual escala length from current colaboradores so both metrics
+    // always reference the same number of days (avoids flicker on month change)
+    const efectiveDias = colaboradores.length > 0
+      ? colaboradores[0].escala.length
+      : diasCount;
+
+    const capacidadeTeorica = baseHC * prodRate * efectiveDias;
 
     let totalWorkDays = 0;
     colaboradores.forEach(c => {
       if (selectedShifts.includes(c.turno)) {
-        c.escala.forEach(status => {
+        c.escala.slice(0, efectiveDias).forEach(status => {
           if (status === 'WORK') {
             totalWorkDays++;
           }
@@ -165,8 +171,8 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
     });
     const capacidadeReal = totalWorkDays * prodRate;
 
-    const perdaCapacidade = capacidadeTeorica > 0 
-      ? ((capacidadeReal - capacidadeTeorica) / capacidadeTeorica) * 100 
+    const perdaCapacidade = capacidadeTeorica > 0
+      ? ((capacidadeReal - capacidadeTeorica) / capacidadeTeorica) * 100
       : 0;
 
     return {
