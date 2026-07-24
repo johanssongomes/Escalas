@@ -167,6 +167,7 @@ function App() {
           }
           if (data.params && typeof data.params === 'object' && Object.keys(data.params).length > 0) {
             setParams(data.params);
+            setPrevMonthYear({ month: data.params.month, year: data.params.year });
             localStorage.setItem('scheduleParams', JSON.stringify(data.params));
           }
           if (data.demanda_m3) {
@@ -395,10 +396,10 @@ function App() {
 
   // Run on initial mount or parameters change (only if not in manual mode)
   useEffect(() => {
-    if (!isManualMode) {
+    if (isInitialLoadDone && !isManualMode) {
       handleRecalculate();
     }
-  }, [params, isManualMode]);
+  }, [params, isManualMode, isInitialLoadDone]);
 
   // Synchronize headcount parameters with the collaborators list (even in manual mode)
   useEffect(() => {
@@ -475,6 +476,7 @@ function App() {
 
   // Save schedule per month/year so changes persist when navigating between months
   useEffect(() => {
+    if (!isInitialLoadDone) return;
     if (params.month !== prevMonthYear.month || params.year !== prevMonthYear.year) {
       if (colaboradores.length > 0 && prevMonthYear.month !== undefined && prevMonthYear.year !== undefined) {
         localStorage.setItem(
@@ -496,7 +498,7 @@ function App() {
       handleRecalculate();
       setPrevMonthYear({ month: params.month, year: params.year });
     }
-  }, [params.month, params.year]);
+  }, [params.month, params.year, isInitialLoadDone]);
 
   const startDay = (params.month !== undefined && params.year !== undefined)
     ? (new Date(params.year, params.month, 1).getDay() + 6) % 7
