@@ -793,8 +793,8 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
                 Cobertura %
               </td>
               {Array.from({ length: diasCount }).map((_, d) => {
-                const activeCount = colaboradores.filter(c => c.escala[d] === 'WORK').length;
-                const totalColabs = colaboradores.length;
+                const activeCount = filteredColaboradores.filter(c => c.escala[d] === 'WORK').length;
+                const totalColabs = filteredColaboradores.length;
                 const pct = totalColabs > 0 ? Math.round((activeCount / totalColabs) * 100) : 0;
                 
                 const isSun = d % 7 === 6;
@@ -829,8 +829,8 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
                   {(() => {
                     const avgPct = Math.round(
                       Array.from({ length: diasCount }).reduce((acc: number, _, d) => {
-                        const activeCount = colaboradores.filter(c => c.escala[d] === 'WORK').length;
-                        const pct = colaboradores.length > 0 ? (activeCount / colaboradores.length) * 100 : 0;
+                        const activeCount = filteredColaboradores.filter(c => c.escala[d] === 'WORK').length;
+                        const pct = filteredColaboradores.length > 0 ? (activeCount / filteredColaboradores.length) * 100 : 0;
                         return acc + pct;
                       }, 0) / diasCount
                     );
