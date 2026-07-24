@@ -499,11 +499,18 @@ function App() {
   };
 
   // Run on initial mount or parameters change (only if not in manual mode)
+  // NOTE: month/year changes are handled separately by the month navigation effect below
   useEffect(() => {
     if (isInitialLoadDone && !isManualMode) {
       handleRecalculate();
     }
-  }, [params, isManualMode, isInitialLoadDone]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    params.conferentesT1, params.conferentesT2, params.conferentesT3,
+    params.dias, params.horasSemanais, params.cenario, params.escala,
+    params.setor, params.weeks,
+    isManualMode, isInitialLoadDone
+  ]);
 
   // Synchronize headcount parameters with the collaborators list (even in manual mode)
   useEffect(() => {
@@ -583,24 +590,37 @@ function App() {
   useEffect(() => {
     if (!isInitialLoadDone) return;
     if (params.month !== prevMonthYear.month || params.year !== prevMonthYear.year) {
+      // Save current month's data to localStorage
       if (colaboradores.length > 0 && prevMonthYear.month !== undefined && prevMonthYear.year !== undefined) {
         localStorage.setItem(
           `escala_saved_${prevMonthYear.month}_${prevMonthYear.year}`,
           JSON.stringify(colaboradores)
         );
       }
+
       const savedKey = `escala_saved_${params.month}_${params.year}`;
       const saved = localStorage.getItem(savedKey);
       if (saved) {
         try {
+          // Batch all state updates together to avoid intermediate renders
           setColaboradores(JSON.parse(saved));
           setIsManualMode(true);
           setPrevMonthYear({ month: params.month, year: params.year });
           return;
         } catch {}
       }
+
+      // No saved data — recalculate for new month.
+      // We set isManualMode and colaboradores together in one logical batch,
+      // then update prevMonthYear. Do NOT call setIsManualMode(false) separately
+      // before handleRecalculate, as that triggers the [isManualMode] effect again.
+      const scale = generateSchedule(params).map(c => ({
+        ...c,
+        team: undefined,
+        escala: Array(c.escala.length).fill('WORK' as DayStatus),
+      }));
+      setColaboradores(scale);
       setIsManualMode(false);
-      handleRecalculate();
       setPrevMonthYear({ month: params.month, year: params.year });
     }
   }, [params.month, params.year, isInitialLoadDone]);
