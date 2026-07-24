@@ -74,17 +74,19 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
     }
   };
 
-  // Productivity rate (m³ per collaborator per day)
-  const [prodRate, setProdRate] = useState<number>(25);
+  // Productivity rate (m³ or Pçs per collaborator per day)
+  const [prodRateM3, setProdRateM3] = useState<number>(25);
+  const [prodRatePcs, setProdRatePcs] = useState<number>(250);
+  const [prodUnit, setProdUnit] = useState<'m3' | 'pcs'>('m3');
+  const prodRate = prodUnit === 'm3' ? prodRateM3 : prodRatePcs;
   // Team manager modal
   const [showTeamManager, setShowTeamManager] = useState(false);
-  // Daily demand store per shift (indexed T1, T2, T3)
-  const [demandaDiaria, setDemandaDiaria] = useState<{ [key: string]: number[] }>(() => {
-    const saved = localStorage.getItem('demandaDiaria');
+  // Daily demand store per shift (indexed T1, T2, T3) for m3
+  const [demandaDiariaM3, setDemandaDiariaM3] = useState<{ [key: string]: number[] }>(() => {
+    const saved = localStorage.getItem('demandaDiaria_m3') || localStorage.getItem('demandaDiaria');
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        // Validate array lengths
         ['T1', 'T2', 'T3'].forEach(s => {
           if (!Array.isArray(parsed[s]) || parsed[s].length !== 28) {
             parsed[s] = Array(28).fill(0);
@@ -99,6 +101,29 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
       T3: Array(28).fill(0)
     };
   });
+
+  // Daily demand store per shift (indexed T1, T2, T3) for pcs
+  const [demandaDiariaPcs, setDemandaDiariaPcs] = useState<{ [key: string]: number[] }>(() => {
+    const saved = localStorage.getItem('demandaDiaria_pcs');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        ['T1', 'T2', 'T3'].forEach(s => {
+          if (!Array.isArray(parsed[s]) || parsed[s].length !== 28) {
+            parsed[s] = Array(28).fill(0);
+          }
+        });
+        return parsed;
+      } catch (e) {}
+    }
+    return {
+      T1: Array(28).fill(0),
+      T2: Array(28).fill(0),
+      T3: Array(28).fill(0)
+    };
+  });
+
+  const demandaDiaria = prodUnit === 'm3' ? demandaDiariaM3 : demandaDiariaPcs;
 
   const capacityStats = useMemo(() => {
     const baseT1 = selectedShifts.includes('T1') ? (params?.conferentesT1 ?? 0) : 0;
@@ -149,11 +174,19 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
   };
 
   const handleDemandaChange = (shift: string, dayIdx: number, val: number) => {
-    const newDemanda = { ...demandaDiaria };
-    if (!newDemanda[shift]) newDemanda[shift] = Array(diasCount).fill(0);
-    newDemanda[shift][dayIdx] = val;
-    setDemandaDiaria(newDemanda);
-    localStorage.setItem('demandaDiaria', JSON.stringify(newDemanda));
+    if (prodUnit === 'm3') {
+      const newDemanda = { ...demandaDiariaM3 };
+      if (!newDemanda[shift]) newDemanda[shift] = Array(diasCount).fill(0);
+      newDemanda[shift][dayIdx] = val;
+      setDemandaDiariaM3(newDemanda);
+      localStorage.setItem('demandaDiaria_m3', JSON.stringify(newDemanda));
+    } else {
+      const newDemanda = { ...demandaDiariaPcs };
+      if (!newDemanda[shift]) newDemanda[shift] = Array(diasCount).fill(0);
+      newDemanda[shift][dayIdx] = val;
+      setDemandaDiariaPcs(newDemanda);
+      localStorage.setItem('demandaDiaria_pcs', JSON.stringify(newDemanda));
+    }
   };
 
   const handleToggleDay = (colabId: string, dayIdx: number) => {
@@ -480,11 +513,37 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
         {/* Card 1: Meta de Produtividade */}
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-4 shadow-sm flex flex-col justify-between">
           <div>
-            <div className="flex items-center gap-2 mb-1">
-              <span className="p-1 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-                <Calculator className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-              </span>
-              <h4 className="text-xs font-bold text-slate-700 dark:text-slate-200">Meta de Produtividade</h4>
+            <div className="flex items-center justify-between mb-1">
+              <div className="flex items-center gap-2">
+                <span className="p-1 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                  <Calculator className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                </span>
+                <h4 className="text-xs font-bold text-slate-700 dark:text-slate-200">Meta de Produtividade</h4>
+              </div>
+
+              {/* Unit Toggle */}
+              <div className="flex bg-slate-100 dark:bg-slate-850 p-0.5 rounded-lg border border-slate-200/50 dark:border-slate-800 shrink-0">
+                <button
+                  onClick={() => setProdUnit('m3')}
+                  className={`px-2 py-0.5 rounded-md text-[9px] font-black transition cursor-pointer ${
+                    prodUnit === 'm3'
+                      ? 'bg-blue-600 text-white shadow-sm'
+                      : 'text-slate-500 dark:text-slate-400'
+                  }`}
+                >
+                  m³
+                </button>
+                <button
+                  onClick={() => setProdUnit('pcs')}
+                  className={`px-2 py-0.5 rounded-md text-[9px] font-black transition cursor-pointer ${
+                    prodUnit === 'pcs'
+                      ? 'bg-blue-600 text-white shadow-sm'
+                      : 'text-slate-500 dark:text-slate-400'
+                  }`}
+                >
+                  Pçs
+                </button>
+              </div>
             </div>
             <p className="text-[10px] text-slate-400 leading-tight">
               Ajuste o volume processado por conferente por dia
@@ -494,10 +553,19 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
             <input
               type="number"
               value={prodRate}
-              onChange={(e) => setProdRate(Math.max(1, parseInt(e.target.value) || 0))}
+              onChange={(e) => {
+                const val = Math.max(1, parseInt(e.target.value) || 0);
+                if (prodUnit === 'm3') {
+                  setProdRateM3(val);
+                } else {
+                  setProdRatePcs(val);
+                }
+              }}
               className="w-20 text-lg font-black text-slate-800 dark:text-slate-100 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-2 py-1.5 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 text-center"
             />
-            <span className="text-slate-500 dark:text-slate-400 font-extrabold text-[11px]">m³/dia</span>
+            <span className="text-slate-500 dark:text-slate-400 font-extrabold text-[11px]">
+              {prodUnit === 'm3' ? 'm³/dia' : 'Pçs/dia'}
+            </span>
           </div>
         </div>
 
@@ -507,7 +575,7 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
             <h5 className="text-[9px] font-black text-slate-450 dark:text-slate-555 uppercase tracking-wider">Capacidade Teórica</h5>
             <div className="flex items-baseline gap-1 mt-3">
               <span className="text-3xl font-black text-slate-800 dark:text-slate-100">{capacityStats.capacidadeTeorica.toLocaleString('pt-BR')}</span>
-              <span className="text-xs font-bold text-slate-400">m³</span>
+              <span className="text-xs font-bold text-slate-400">{prodUnit === 'm3' ? 'm³' : 'Pçs'}</span>
             </div>
           </div>
           <p className="text-[10px] text-slate-400 mt-4">
@@ -521,7 +589,7 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
             <h5 className="text-[9px] font-black text-slate-450 dark:text-slate-555 uppercase tracking-wider">Capacidade com Folgas</h5>
             <div className="flex items-baseline gap-1 mt-3">
               <span className="text-3xl font-black text-blue-600 dark:text-blue-400">{capacityStats.capacidadeReal.toLocaleString('pt-BR')}</span>
-              <span className="text-xs font-bold text-blue-400">m³</span>
+              <span className="text-xs font-bold text-blue-400">{prodUnit === 'm3' ? 'm³' : 'Pçs'}</span>
             </div>
           </div>
           <div className="flex items-center gap-1.5 text-[9px] text-emerald-600 dark:text-emerald-400 font-bold mt-4 pt-2 border-t border-slate-100 dark:border-slate-800/50">
