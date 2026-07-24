@@ -156,15 +156,79 @@ function App() {
         if (error) {
           console.error("Erro ao carregar dados do Supabase:", error);
         } else if (data) {
+          let loadedColabs: Colaborador[] = [];
+          let loadedTeams: TeamConfig[] = [];
+
+          if (data.teams && Array.isArray(data.teams)) {
+            loadedTeams = data.teams;
+            setTeams(loadedTeams);
+            localStorage.setItem('escala_teams_config', JSON.stringify(loadedTeams));
+          }
+
           if (data.colaboradores && Array.isArray(data.colaboradores) && data.colaboradores.length > 0) {
-            setColaboradores(data.colaboradores);
-            localStorage.setItem('escala_colaboradores_auto', JSON.stringify(data.colaboradores));
+            loadedColabs = data.colaboradores;
+
+            // Check if the DB has corrupted data: colabs exist but none have a team assigned
+            const hasTeamData = loadedColabs.some(c => c.team !== undefined && c.team !== null);
+            const hasEscalaData = loadedColabs.some(c => c.escala && c.escala.some(d => d !== 'WORK'));
+
+            if (!hasTeamData && !hasEscalaData && loadedTeams.length > 0 && data.params) {
+              // Auto-recover: DB has wiped state — re-apply teams now
+              console.warn("DB tem dados zerados — reaplicando equipes automaticamente...");
+              const sDay = (data.params.month !== undefined && data.params.year !== undefined)
+                ? (new Date(data.params.year, data.params.month, 1).getDay() + 6) % 7
+                : 0;
+              const dias = (data.params.month !== undefined && data.params.year !== undefined)
+                ? new Date(data.params.year, data.params.month + 1, 0).getDate()
+                : (data.params.dias ?? 28);
+
+              // We can't call applyTeamsToColaboradores here (it's defined later in the component)
+              // so we inline a minimal version for recovery
+              const recovered = [...loadedColabs];
+              const shifts = ['T1', 'T2', 'T3'] as const;
+              for (const shift of shifts) {
+                const shiftColabs = recovered.filter(c => c.turno === shift);
+                const shiftTeams = loadedTeams.filter(t => t.shiftType === shift);
+                let cursor = 0;
+                for (const team of shiftTeams) {
+                  for (let i = 0; i < team.memberCount && cursor < shiftColabs.length; i++) {
+                    const colab = shiftColabs[cursor];
+                    const pat = team.offPattern;
+                    const escala = Array.from({ length: dias }, (_, d) => {
+                      const dw = (sDay + d) % 7;
+                      if (Array.isArray(pat)) return (dw === pat[0] || dw === pat[1]) ? 'OFF' : 'WORK';
+                      const isOff = pat === 4 ? (dw === 4 || dw === 5) : pat === 5 ? (dw === 5 || dw === 6) : (dw === 6 || dw === 0);
+                      return isOff ? 'OFF' : 'WORK';
+                    }) as DayStatus[];
+                    const idx = recovered.findIndex(c => c.id === colab.id);
+                    if (idx !== -1) recovered[idx] = { ...recovered[idx], team: team.name, escala };
+                    cursor++;
+                  }
+                }
+              }
+              loadedColabs = recovered;
+              // Save the recovered state back to Supabase immediately
+              try {
+                await activeClient.from('escala_config').upsert({
+                  id: 1,
+                  colaboradores: recovered,
+                  teams: loadedTeams,
+                  params: data.params,
+                  demanda_m3: data.demanda_m3,
+                  demanda_pcs: data.demanda_pcs,
+                  updated_at: new Date().toISOString(),
+                });
+                console.log("Estado recuperado e salvo no banco com sucesso.");
+              } catch (saveErr) {
+                console.error("Erro ao salvar estado recuperado:", saveErr);
+              }
+            }
+
+            setColaboradores(loadedColabs);
+            localStorage.setItem('escala_colaboradores_auto', JSON.stringify(loadedColabs));
             setIsManualMode(true);
           }
-          if (data.teams && Array.isArray(data.teams)) {
-            setTeams(data.teams);
-            localStorage.setItem('escala_teams_config', JSON.stringify(data.teams));
-          }
+
           if (data.params && typeof data.params === 'object' && Object.keys(data.params).length > 0) {
             setParams(data.params);
             setPrevMonthYear({ month: data.params.month, year: data.params.year });
@@ -188,15 +252,17 @@ function App() {
     loadData();
   }, []);
 
-  // Track isInitialLoadDone
+  // Track isInitialLoadDone — after DB load completes, auto-apply teams if DB has wiped state
   useEffect(() => {
     if (!dbLoading) {
-      const t = setTimeout(() => setIsInitialLoadDone(true), 800);
+      const t = setTimeout(() => {
+        setIsInitialLoadDone(true);
+      }, 800);
       return () => clearTimeout(t);
     }
   }, [dbLoading]);
 
-  // Debounced Auto-save to Supabase
+  // Debounced Auto-save to Supabase — only fires when user makes an explicit change
   useEffect(() => {
     const client = supabase;
     if (!isInitialLoadDone || !client || !isDirty) return;
@@ -222,16 +288,18 @@ function App() {
           setSyncStatus('error');
         } else {
           setSyncStatus('synced');
-          setIsDirty(false); // Reset dirty flag
+          setIsDirty(false);
         }
       } catch (err) {
         console.error("Erro ao salvar no banco:", err);
         setSyncStatus('error');
       }
-    }, 1500); // Auto-save after 1.5 seconds of inactivity
+    }, 1500);
 
     return () => clearTimeout(delayDebounce);
-  }, [colaboradores, teams, params, demandaDiariaM3, demandaDiariaPcs, isInitialLoadDone, isDirty]);
+  // NOTE: colaboradores/teams/params are NOT in the dep array — we only want this to fire when isDirty flips true
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isDirty, isInitialLoadDone]);
 
   // Real-time listener for changes from other users
   useEffect(() => {
@@ -508,6 +576,7 @@ function App() {
     }
 
     setColaboradores(updated);
+    // Do NOT mark dirty here — headcount sync is an internal adjustment, not a user edit
   }, [params.conferentesT1, params.conferentesT2, params.conferentesT3]);
 
   // Save schedule per month/year so changes persist when navigating between months
