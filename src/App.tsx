@@ -161,44 +161,94 @@ function App() {
   // Track isInitialLoadDone
   useEffect(() => {
     if (!dbLoading) {
-      // Small timeout to prevent immediate pending state on load
       const t = setTimeout(() => setIsInitialLoadDone(true), 800);
       return () => clearTimeout(t);
     }
   }, [dbLoading]);
 
-  // Track changes to mark sync pending
+  // Debounced Auto-save to Supabase
   useEffect(() => {
-    if (isInitialLoadDone) {
-      setSyncStatus('pending');
-    }
+    if (!isInitialLoadDone) return;
+
+    setSyncStatus('pending');
+
+    const delayDebounce = setTimeout(async () => {
+      setSyncStatus('saving');
+      try {
+        const { error } = await supabase
+          .from('escala_config')
+          .upsert({
+            id: 1,
+            colaboradores,
+            teams,
+            params,
+            demanda_m3: demandaDiariaM3,
+            demanda_pcs: demandaDiariaPcs,
+            updated_at: new Date().toISOString(),
+          });
+        if (error) {
+          console.error("Erro ao salvar no banco:", error);
+          setSyncStatus('error');
+        } else {
+          setSyncStatus('synced');
+        }
+      } catch (err) {
+        console.error("Erro ao salvar no banco:", err);
+        setSyncStatus('error');
+      }
+    }, 1500); // Auto-save after 1.5 seconds of inactivity
+
+    return () => clearTimeout(delayDebounce);
   }, [colaboradores, teams, params, demandaDiariaM3, demandaDiariaPcs, isInitialLoadDone]);
 
-  const handleSaveToCloud = async () => {
-    setSyncStatus('saving');
-    try {
-      const { error } = await supabase
-        .from('escala_config')
-        .upsert({
-          id: 1,
-          colaboradores,
-          teams,
-          params,
-          demanda_m3: demandaDiariaM3,
-          demanda_pcs: demandaDiariaPcs,
-          updated_at: new Date().toISOString(),
-        });
-      if (error) {
-        console.error("Erro ao salvar no banco:", error);
-        setSyncStatus('error');
-      } else {
-        setSyncStatus('synced');
-      }
-    } catch (err) {
-      console.error("Erro ao salvar no banco:", err);
-      setSyncStatus('error');
-    }
-  };
+  // Real-time listener for changes from other users
+  useEffect(() => {
+    if (!isInitialLoadDone) return;
+
+    const channel = supabase
+      .channel('escala_realtime')
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'escala_config', filter: 'id=eq.1' },
+        (payload) => {
+          console.log("Recebido update via Realtime:", payload.new);
+          const newDoc = payload.new;
+          if (newDoc) {
+            // Only update local state if we are currently synchronized (to prevent overwriting active edits)
+            setSyncStatus((currentStatus) => {
+              if (currentStatus === 'synced') {
+                if (newDoc.colaboradores) {
+                  setColaboradores(newDoc.colaboradores);
+                  localStorage.setItem('escala_colaboradores_auto', JSON.stringify(newDoc.colaboradores));
+                }
+                if (newDoc.teams) {
+                  setTeams(newDoc.teams);
+                  localStorage.setItem('escala_teams_config', JSON.stringify(newDoc.teams));
+                }
+                if (newDoc.params) {
+                  setParams(newDoc.params);
+                  localStorage.setItem('scheduleParams', JSON.stringify(newDoc.params));
+                }
+                if (newDoc.demanda_m3) {
+                  setDemandaDiariaM3(newDoc.demanda_m3);
+                  localStorage.setItem('demandaDiaria_m3', JSON.stringify(newDoc.demanda_m3));
+                }
+                if (newDoc.demanda_pcs) {
+                  setDemandaDiariaPcs(newDoc.demanda_pcs);
+                  localStorage.setItem('demandaDiaria_pcs', JSON.stringify(newDoc.demanda_pcs));
+                }
+              }
+              return currentStatus;
+            });
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [isInitialLoadDone]);
 
   // Distribute collaborators to teams based on the configured memberCount
   const applyTeamsToColaboradores = (colabs: Colaborador[], newTeams: TeamConfig[], startDay: number, dias: number): Colaborador[] => {
@@ -467,21 +517,14 @@ function App() {
           </div>
 
           <div className="flex items-center gap-4 flex-wrap">
-            {/* Cloud Sync Controller */}
-            <div className="flex items-center gap-2 bg-white/10 border border-white/20 p-1.5 px-3 rounded-xl backdrop-blur-md text-xs">
-              <span className="font-bold uppercase tracking-wider text-[9px] min-w-[110px]">
-                {syncStatus === 'synced' && <span className="text-emerald-400">● Nuvem Sincronizada</span>}
-                {syncStatus === 'pending' && <span className="text-amber-400">● Pendente de Salvar</span>}
-                {syncStatus === 'saving' && <span className="text-blue-300 animate-pulse">● Salvando...</span>}
+            {/* Cloud Sync Status (Auto-save) */}
+            <div className="flex items-center gap-2 bg-white/10 border border-white/20 p-2.5 px-4 rounded-xl backdrop-blur-md text-xs">
+              <span className="font-bold uppercase tracking-wider text-[9.5px]">
+                {syncStatus === 'synced' && <span className="text-emerald-400">● Sincronizado</span>}
+                {syncStatus === 'pending' && <span className="text-amber-400">● Salvando automaticamente...</span>}
+                {syncStatus === 'saving' && <span className="text-blue-300 animate-pulse">● Salvando na Nuvem...</span>}
                 {syncStatus === 'error' && <span className="text-rose-400">● Erro ao salvar</span>}
               </span>
-              <button
-                disabled={syncStatus === 'saving' || dbLoading}
-                onClick={handleSaveToCloud}
-                className="p-1 px-3 rounded-lg bg-orange-500 hover:bg-orange-600 text-white font-black text-[10px] transition cursor-pointer disabled:opacity-50 uppercase shadow"
-              >
-                Salvar
-              </button>
             </div>
 
             <button
