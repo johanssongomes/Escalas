@@ -36,6 +36,16 @@ export const OFF_PATTERN_LABELS: Record<4 | 5 | 6, string> = {
   6: 'Dom / Seg',
 };
 
+export const WEEKDAYS = [
+  { value: 0, label: 'Seg' },
+  { value: 1, label: 'Ter' },
+  { value: 2, label: 'Qua' },
+  { value: 3, label: 'Qui' },
+  { value: 4, label: 'Sex' },
+  { value: 5, label: 'Sáb' },
+  { value: 6, label: 'Dom' },
+];
+
 const SHIFTS: ShiftType[] = ['T1', 'T2', 'T3'];
 const SHIFT_LABELS: Record<ShiftType, string> = {
   T1: '1º Turno (T1)',
@@ -132,7 +142,7 @@ const TeamRow: React.FC<TeamRowProps> = ({ team, maxTotal, usedByOthers, onChang
           {/* Off pattern radio */}
           <div className="flex flex-col gap-1">
             <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Padrão de Folga</span>
-            <div className="flex gap-3">
+            <div className="flex items-center gap-3 flex-wrap">
               {([4, 5, 6] as (4 | 5 | 6)[]).map(val => (
                 <label key={val} className="flex items-center gap-1.5 cursor-pointer">
                   <input
@@ -145,6 +155,47 @@ const TeamRow: React.FC<TeamRowProps> = ({ team, maxTotal, usedByOthers, onChang
                   <span className="text-xs text-slate-700 dark:text-slate-300 font-semibold">{OFF_PATTERN_LABELS[val]}</span>
                 </label>
               ))}
+
+              <label className="flex items-center gap-1.5 cursor-pointer">
+                <input
+                  type="radio"
+                  name={`pat-${draft.id}`}
+                  checked={Array.isArray(draft.offPattern)}
+                  onChange={() => setDraft(d => ({ ...d, offPattern: [0, 1] }))}
+                  className="accent-blue-600"
+                />
+                <span className="text-xs text-slate-700 dark:text-slate-300 font-semibold">Personalizado</span>
+              </label>
+
+              {Array.isArray(draft.offPattern) && (
+                <div className="flex items-center gap-1 bg-white dark:bg-slate-900 px-2 py-0.5 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm shrink-0">
+                  <select
+                    value={draft.offPattern[0]}
+                    onChange={e => {
+                      const val = parseInt(e.target.value);
+                      setDraft(d => ({ ...d, offPattern: [val, (d.offPattern as [number, number])[1]] }));
+                    }}
+                    className="text-xs font-bold bg-transparent text-slate-750 dark:text-slate-250 focus:outline-none cursor-pointer"
+                  >
+                    {WEEKDAYS.map(day => (
+                      <option key={day.value} value={day.value}>{day.label}</option>
+                    ))}
+                  </select>
+                  <span className="text-slate-400 text-xs">/</span>
+                  <select
+                    value={draft.offPattern[1]}
+                    onChange={e => {
+                      const val = parseInt(e.target.value);
+                      setDraft(d => ({ ...d, offPattern: [(d.offPattern as [number, number])[0], val] }));
+                    }}
+                    className="text-xs font-bold bg-transparent text-slate-750 dark:text-slate-250 focus:outline-none cursor-pointer"
+                  >
+                    {WEEKDAYS.map(day => (
+                      <option key={day.value} value={day.value}>{day.label}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
             </div>
           </div>
 
@@ -187,7 +238,9 @@ const TeamRow: React.FC<TeamRowProps> = ({ team, maxTotal, usedByOthers, onChang
 
       {/* Off pattern badge */}
       <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 bg-white/70 dark:bg-slate-900/50 px-2 py-0.5 rounded-lg border border-white/60 dark:border-slate-700/40 shrink-0">
-        {OFF_PATTERN_LABELS[team.offPattern]}
+        {Array.isArray(team.offPattern)
+          ? `${WEEKDAYS.find(w => w.value === (team.offPattern as [number, number])[0])?.label} / ${WEEKDAYS.find(w => w.value === (team.offPattern as [number, number])[1])?.label}`
+          : OFF_PATTERN_LABELS[team.offPattern as 4 | 5 | 6]}
       </span>
 
       {/* Count badge */}
@@ -227,7 +280,7 @@ interface AddTeamFormProps {
 const AddTeamForm: React.FC<AddTeamFormProps> = ({ shift, remaining, onAdd, onCancel }) => {
   const [name, setName] = useState('');
   const [colorKey, setColorKey] = useState<TeamConfig['colorKey']>('emerald');
-  const [offPattern, setOffPattern] = useState<4 | 5 | 6>(5);
+  const [offPattern, setOffPattern] = useState<TeamConfig['offPattern']>(5);
   const [count, setCount] = useState(Math.max(0, remaining));
   const [showColorPicker, setShowColorPicker] = useState(false);
 
@@ -285,7 +338,7 @@ const AddTeamForm: React.FC<AddTeamFormProps> = ({ shift, remaining, onAdd, onCa
         {/* Off pattern */}
         <div className="flex flex-col gap-1">
           <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Padrão de Folga</span>
-          <div className="flex gap-3">
+          <div className="flex items-center gap-3 flex-wrap">
             {([4, 5, 6] as (4 | 5 | 6)[]).map(val => (
               <label key={val} className="flex items-center gap-1.5 cursor-pointer">
                 <input
@@ -298,6 +351,47 @@ const AddTeamForm: React.FC<AddTeamFormProps> = ({ shift, remaining, onAdd, onCa
                 <span className="text-xs text-slate-700 dark:text-slate-300 font-semibold">{OFF_PATTERN_LABELS[val]}</span>
               </label>
             ))}
+
+            <label className="flex items-center gap-1.5 cursor-pointer">
+              <input
+                type="radio"
+                name={`new-pat-${shift}`}
+                checked={Array.isArray(offPattern)}
+                onChange={() => setOffPattern([0, 1])}
+                className="accent-blue-600"
+              />
+              <span className="text-xs text-slate-700 dark:text-slate-300 font-semibold">Personalizado</span>
+            </label>
+
+            {Array.isArray(offPattern) && (
+              <div className="flex items-center gap-1 bg-white dark:bg-slate-900 px-2 py-0.5 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm shrink-0">
+                <select
+                  value={offPattern[0]}
+                  onChange={e => {
+                    const val = parseInt(e.target.value);
+                    setOffPattern([val, (offPattern as [number, number])[1]]);
+                  }}
+                  className="text-xs font-bold bg-transparent text-slate-750 dark:text-slate-250 focus:outline-none cursor-pointer"
+                >
+                  {WEEKDAYS.map(day => (
+                    <option key={day.value} value={day.value}>{day.label}</option>
+                  ))}
+                </select>
+                <span className="text-slate-400 text-xs">/</span>
+                <select
+                  value={offPattern[1]}
+                  onChange={e => {
+                    const val = parseInt(e.target.value);
+                    setOffPattern([(offPattern as [number, number])[0], val]);
+                  }}
+                  className="text-xs font-bold bg-transparent text-slate-750 dark:text-slate-250 focus:outline-none cursor-pointer"
+                >
+                  {WEEKDAYS.map(day => (
+                    <option key={day.value} value={day.value}>{day.label}</option>
+                  ))}
+                </select>
+              </div>
+            )}
           </div>
         </div>
 

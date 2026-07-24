@@ -1,20 +1,20 @@
 import { useState, useEffect } from 'react';
-import { ShiftCards } from './components/Schedule/ShiftCards';
 import { ParametersForm } from './components/Schedule/ParametersForm';
-import { CompliancePanel } from './components/Schedule/CompliancePanel';
 import { CalendarGrid } from './components/Schedule/CalendarGrid';
+import { generateSchedule } from './utils/scheduleEngine';
+import type { ScheduleParams, Colaborador, TeamConfig, DayStatus } from './types';
+import { ShieldCheck, Truck, Moon, Sun, Calendar, BarChart3, Upload } from 'lucide-react';
+import { ImportModal } from './components/Schedule/ImportModal';
+
+import { ShiftCards } from './components/Schedule/ShiftCards';
+import { CompliancePanel } from './components/Schedule/CompliancePanel';
 import { CoverageTable } from './components/Schedule/CoverageTable';
 import { ExportActions } from './components/Schedule/ExportActions';
 import { Indicators } from './components/Dashboard/Indicators';
 import { Charts } from './components/Dashboard/Charts';
 import { ShiftTimeline } from './components/Dashboard/ShiftTimeline';
-import { generateSchedule } from './utils/scheduleEngine';
 import { calculateDailyCoverage, calculateWeeklyCoverage } from './utils/coverageEngine';
 import { calculateIndicators } from './utils/dashboardEngine';
-import type { ScheduleParams, Colaborador, TeamConfig, DayStatus } from './types';
-import { ShieldCheck, Truck, Moon, Sun, BarChart3, Calendar, Users } from 'lucide-react';
-import { ProductivitySimulator } from './components/Dashboard/ProductivitySimulator';
-import { CollaboratorSimulator } from './components/Dashboard/CollaboratorSimulator';
 
 function App() {
   const [darkMode, setDarkMode] = useState<boolean>(() => {
@@ -69,7 +69,9 @@ function App() {
     }
     return [];
   });
-  const [activeTab, setActiveTab] = useState<'escala' | 'produtividade' | 'colaboradores'>('escala');
+
+  const [activeTab, setActiveTab] = useState<'painel' | 'planejador'>('painel');
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
 
   const [teams, setTeams] = useState<TeamConfig[]>(() => {
     if (typeof window !== 'undefined') {
@@ -111,9 +113,11 @@ function App() {
           const colab = shiftColabs[cursor];
           const pat = team.offPattern;
 
-          // Generate pattern for this team
           const escala = Array.from({ length: dias }, (_, d) => {
             const dw = (startDay + d) % 7;
+            if (Array.isArray(pat)) {
+              return (dw === pat[0] || dw === pat[1]) ? 'OFF' : 'WORK';
+            }
             const isOff = pat === 4 ? (dw === 4 || dw === 5) :
                           pat === 5 ? (dw === 5 || dw === 6) :
                           (dw === 6 || dw === 0);
@@ -307,8 +311,6 @@ function App() {
     }
   }, [params.month, params.year]);
 
-
-
   const startDay = (params.month !== undefined && params.year !== undefined)
     ? (new Date(params.year, params.month, 1).getDay() + 6) % 7
     : 0;
@@ -367,41 +369,30 @@ function App() {
         {/* Navigation Tabs */}
         <div className="flex border-b border-slate-200 dark:border-slate-800 gap-6 pb-px noprint">
           <button
-            onClick={() => setActiveTab('escala')}
+            onClick={() => setActiveTab('painel')}
             className={`pb-3 text-sm font-bold transition relative flex items-center gap-2 cursor-pointer ${
-              activeTab === 'escala'
-                ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400'
-                : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'
-            }`}
-          >
-            <Calendar className="w-4 h-4" />
-            Calendário & Escala
-          </button>
-          <button
-            onClick={() => setActiveTab('produtividade')}
-            className={`pb-3 text-sm font-bold transition relative flex items-center gap-2 cursor-pointer ${
-              activeTab === 'produtividade'
+              activeTab === 'painel'
                 ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400'
                 : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'
             }`}
           >
             <BarChart3 className="w-4 h-4" />
-            Simulador de Produtividade
+            Painel & Resumo
           </button>
           <button
-            onClick={() => setActiveTab('colaboradores')}
+            onClick={() => setActiveTab('planejador')}
             className={`pb-3 text-sm font-bold transition relative flex items-center gap-2 cursor-pointer ${
-              activeTab === 'colaboradores'
+              activeTab === 'planejador'
                 ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400'
                 : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'
             }`}
           >
-            <Users className="w-4 h-4" />
-            Simulador de Colaboradores
+            <Calendar className="w-4 h-4" />
+            Calendário & Planejamento
           </button>
         </div>
 
-        {activeTab === 'escala' ? (
+        {activeTab === 'painel' ? (
           <>
             {/* Filtro do Modelo de Carga Horária Semanal e Cenários */}
             <section className="noprint">
@@ -495,16 +486,33 @@ function App() {
               />
             </section>
 
+            {/* Module 5 & 6: Coverage Tables */}
+            <section className="print-no-break">
+              <CoverageTable dailyCoverage={dailyCoverage} weeklyCoverage={weeklyCoverage} />
+            </section>
+          </>
+        ) : (
+          <>
             {/* Unified Planning & Scale Card (Module 2, 4 & 9) */}
             <section className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 shadow-sm mb-8 space-y-6 print-break-after">
-              <div className="flex items-center gap-2 mb-2 pb-4 border-b border-slate-100 dark:border-slate-800">
-                <Calendar className="w-6 h-6 text-blue-600" />
-                <div>
-                  <h3 className="text-base font-black text-slate-800 dark:text-slate-100">
-                    Calendário de Planejamento & Parâmetros (28 Dias)
-                  </h3>
-                  <p className="text-[11px] text-slate-400">Ajuste as metas de Hc, regras da CLT e veja o impacto imediatamente na escala</p>
+              <div className="flex items-center justify-between mb-2 pb-4 border-b border-slate-100 dark:border-slate-800">
+                <div className="flex items-center gap-2">
+                  <Calendar className="w-6 h-6 text-blue-600" />
+                  <div>
+                    <h3 className="text-base font-black text-slate-800 dark:text-slate-100">
+                      Calendário de Planejamento & Parâmetros (28 Dias)
+                    </h3>
+                    <p className="text-[11px] text-slate-400">Ajuste as metas de Hc, regras da CLT e veja o impacto imediatamente na escala</p>
+                  </div>
                 </div>
+
+                <button
+                  onClick={() => setIsImportModalOpen(true)}
+                  className="text-[11px] font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 px-3.5 py-1.5 rounded-full flex items-center gap-1.5 hover:bg-blue-100 dark:hover:bg-blue-900/50 transition cursor-pointer"
+                >
+                  <Upload className="w-3.5 h-3.5" />
+                  Importe Leis - Normas
+                </button>
               </div>
 
               {/* Part 1: Parameters Form */}
@@ -534,23 +542,19 @@ function App() {
                 onUpdateTeams={handleUpdateTeams}
               />
             </section>
-
-            {/* Module 5 & 6: Coverage Tables */}
-            <section className="print-no-break">
-              <CoverageTable dailyCoverage={dailyCoverage} weeklyCoverage={weeklyCoverage} />
-            </section>
           </>
-        ) : activeTab === 'produtividade' ? (
-          <ProductivitySimulator colaboradores={colaboradores} params={params} />
-        ) : (
-          <CollaboratorSimulator
-            colaboradores={colaboradores}
-            setColaboradores={setColaboradores}
-            params={params}
-            onReset={handleRecalculate}
-          />
         )}
 
+        <ImportModal
+          isOpen={isImportModalOpen}
+          onClose={() => setIsImportModalOpen(false)}
+          onApplyRules={(rules) => {
+            setParams(prev => ({
+              ...prev,
+              ...rules
+            }));
+          }}
+        />
       </main>
 
       {/* Footer */}

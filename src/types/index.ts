@@ -18,7 +18,7 @@ export interface TeamConfig {
   name: string;         // e.g. "Time A", "Time Elite"
   colorKey: 'emerald' | 'amber' | 'indigo' | 'rose' | 'sky' | 'violet';
   shiftType: ShiftType;
-  offPattern: 4 | 5 | 6; // 4=Sex/Sáb, 5=Sáb/Dom, 6=Dom/Seg
+  offPattern: 4 | 5 | 6 | [number, number]; // 4=Sex/Sáb, 5=Sáb/Dom, 6=Dom/Seg or custom days
   memberCount: number;
 }
 
