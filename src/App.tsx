@@ -21,6 +21,7 @@ function App() {
   const [dbLoading, setDbLoading] = useState<boolean>(true);
   const [syncStatus, setSyncStatus] = useState<'synced' | 'pending' | 'saving' | 'error'>('synced');
   const [isInitialLoadDone, setIsInitialLoadDone] = useState<boolean>(false);
+  const [isDirty, setIsDirty] = useState<boolean>(false);
 
   const [darkMode, setDarkMode] = useState<boolean>(() => {
     if (typeof window !== 'undefined') {
@@ -119,6 +120,27 @@ function App() {
     return { T1: Array(28).fill(0), T2: Array(28).fill(0), T3: Array(28).fill(0) };
   });
 
+  // State wrappers to automatically set the dirty flag on user edits
+  const handleParamsChange = (newParams: ScheduleParams | ((prev: ScheduleParams) => ScheduleParams)) => {
+    setParams(newParams);
+    setIsDirty(true);
+  };
+
+  const handleColaboradoresChange = (newColabs: Colaborador[]) => {
+    setColaboradores(newColabs);
+    setIsDirty(true);
+  };
+
+  const handleDemandaM3Change = (newDemanda: { [key: string]: number[] }) => {
+    setDemandaDiariaM3(newDemanda);
+    setIsDirty(true);
+  };
+
+  const handleDemandaPcsChange = (newDemanda: { [key: string]: number[] }) => {
+    setDemandaDiariaPcs(newDemanda);
+    setIsDirty(true);
+  };
+
   // Load from Supabase on init
   useEffect(() => {
     const client = supabase;
@@ -176,7 +198,7 @@ function App() {
   // Debounced Auto-save to Supabase
   useEffect(() => {
     const client = supabase;
-    if (!isInitialLoadDone || !client) return;
+    if (!isInitialLoadDone || !client || !isDirty) return;
 
     setSyncStatus('pending');
 
@@ -199,6 +221,7 @@ function App() {
           setSyncStatus('error');
         } else {
           setSyncStatus('synced');
+          setIsDirty(false); // Reset dirty flag
         }
       } catch (err) {
         console.error("Erro ao salvar no banco:", err);
@@ -207,7 +230,7 @@ function App() {
     }, 1500); // Auto-save after 1.5 seconds of inactivity
 
     return () => clearTimeout(delayDebounce);
-  }, [colaboradores, teams, params, demandaDiariaM3, demandaDiariaPcs, isInitialLoadDone]);
+  }, [colaboradores, teams, params, demandaDiariaM3, demandaDiariaPcs, isInitialLoadDone, isDirty]);
 
   // Real-time listener for changes from other users
   useEffect(() => {
@@ -331,6 +354,7 @@ function App() {
     const updated = applyTeamsToColaboradores(colaboradores, newTeams, startDay, dias);
     setColaboradores(updated);
     setIsManualMode(true);
+    setIsDirty(true);
   };
 
   const [isManualMode, setIsManualMode] = useState<boolean>(() => {
@@ -369,6 +393,7 @@ function App() {
       escala: Array(c.escala.length).fill('WORK' as DayStatus),
     }));
     setColaboradores(scale);
+    setIsDirty(true);
   };
 
   // Run on initial mount or parameters change (only if not in manual mode)
@@ -596,7 +621,7 @@ function App() {
                     {[40, 42, 44].map((hours) => (
                       <button
                         key={hours}
-                        onClick={() => setParams({ ...params, horasSemanais: hours as 40 | 42 | 44 })}
+                        onClick={() => handleParamsChange({ ...params, horasSemanais: hours as 40 | 42 | 44 })}
                         className={`px-5 py-2 rounded-xl text-xs font-black transition duration-200 cursor-pointer ${
                           params.horasSemanais === hours
                             ? 'bg-blue-600 text-white shadow-md'
@@ -619,7 +644,7 @@ function App() {
                     {(['A', 'B', 'C', 'D'] as const).map((scen) => (
                       <button
                         key={scen}
-                        onClick={() => setParams({ ...params, cenario: scen })}
+                        onClick={() => handleParamsChange({ ...params, cenario: scen })}
                         className={`px-5 py-2 rounded-xl text-xs font-black transition duration-200 cursor-pointer ${
                           params.cenario === scen
                             ? 'bg-orange-500 text-white shadow-md'
@@ -708,7 +733,7 @@ function App() {
               <div className="noprint">
                 <ParametersForm
                   initialValues={params}
-                  onChange={setParams}
+                  onChange={handleParamsChange}
                   plain={true}
                 />
               </div>
@@ -723,7 +748,7 @@ function App() {
                 month={params.month} 
                 year={params.year} 
                 plain={true} 
-                onUpdateColaboradores={setColaboradores}
+                onUpdateColaboradores={handleColaboradoresChange}
                 isManualMode={isManualMode}
                 onToggleManualMode={setIsManualMode}
                 params={params}
@@ -731,8 +756,8 @@ function App() {
                 onUpdateTeams={handleUpdateTeams}
                 demandaDiariaM3Prop={demandaDiariaM3}
                 demandaDiariaPcsProp={demandaDiariaPcs}
-                onDemandaChangeM3={setDemandaDiariaM3}
-                onDemandaChangePcs={setDemandaDiariaPcs}
+                onDemandaChangeM3={handleDemandaM3Change}
+                onDemandaChangePcs={handleDemandaPcsChange}
               />
             </section>
           </>
@@ -742,7 +767,7 @@ function App() {
           isOpen={isImportModalOpen}
           onClose={() => setIsImportModalOpen(false)}
           onApplyRules={(rules) => {
-            setParams(prev => ({
+            handleParamsChange(prev => ({
               ...prev,
               ...rules
             }));
