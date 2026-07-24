@@ -121,6 +121,11 @@ function App() {
 
   // Load from Supabase on init
   useEffect(() => {
+    if (!supabase) {
+      console.warn("Supabase não configurado. Rodando em modo local.");
+      setDbLoading(false);
+      return;
+    }
     async function loadData() {
       try {
         const { data, error } = await supabase.from('escala_config').select('*').eq('id', 1).single();
@@ -168,7 +173,7 @@ function App() {
 
   // Debounced Auto-save to Supabase
   useEffect(() => {
-    if (!isInitialLoadDone) return;
+    if (!isInitialLoadDone || !supabase) return;
 
     setSyncStatus('pending');
 
@@ -203,7 +208,7 @@ function App() {
 
   // Real-time listener for changes from other users
   useEffect(() => {
-    if (!isInitialLoadDone) return;
+    if (!isInitialLoadDone || !supabase) return;
 
     const channel = supabase
       .channel('escala_realtime')
