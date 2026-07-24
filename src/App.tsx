@@ -76,7 +76,7 @@ function App() {
     return [];
   });
 
-  const [activeTab, setActiveTab] = useState<'painel' | 'planejador'>('painel');
+  const [activeTab, setActiveTab] = useState<'painel' | 'planejador'>('planejador');
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
 
   const [teams, setTeams] = useState<TeamConfig[]>(() => {
@@ -241,37 +241,34 @@ function App() {
       .channel('escala_realtime')
       .on(
         'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'escala_config', filter: 'id=eq.1' },
+        { event: 'UPDATE', schema: 'public', table: 'escala_config' },
         (payload) => {
           console.log("Recebido update via Realtime:", payload.new);
-          const newDoc = payload.new;
-          if (newDoc) {
-            // Only update local state if we are currently synchronized (to prevent overwriting active edits)
-            setSyncStatus((currentStatus) => {
-              if (currentStatus === 'synced') {
-                if (newDoc.colaboradores) {
-                  setColaboradores(newDoc.colaboradores);
-                  localStorage.setItem('escala_colaboradores_auto', JSON.stringify(newDoc.colaboradores));
-                }
-                if (newDoc.teams) {
-                  setTeams(newDoc.teams);
-                  localStorage.setItem('escala_teams_config', JSON.stringify(newDoc.teams));
-                }
-                if (newDoc.params) {
-                  setParams(newDoc.params);
-                  localStorage.setItem('scheduleParams', JSON.stringify(newDoc.params));
-                }
-                if (newDoc.demanda_m3) {
-                  setDemandaDiariaM3(newDoc.demanda_m3);
-                  localStorage.setItem('demandaDiaria_m3', JSON.stringify(newDoc.demanda_m3));
-                }
-                if (newDoc.demanda_pcs) {
-                  setDemandaDiariaPcs(newDoc.demanda_pcs);
-                  localStorage.setItem('demandaDiaria_pcs', JSON.stringify(newDoc.demanda_pcs));
-                }
+          const newDoc = payload.new as any;
+          if (newDoc && newDoc.id === 1) {
+            // Only update local state if we don't have unsaved local edits
+            if (!isDirty && syncStatus !== 'saving') {
+              if (newDoc.colaboradores) {
+                setColaboradores(newDoc.colaboradores);
+                localStorage.setItem('escala_colaboradores_auto', JSON.stringify(newDoc.colaboradores));
               }
-              return currentStatus;
-            });
+              if (newDoc.teams) {
+                setTeams(newDoc.teams);
+                localStorage.setItem('escala_teams_config', JSON.stringify(newDoc.teams));
+              }
+              if (newDoc.params) {
+                setParams(newDoc.params);
+                localStorage.setItem('scheduleParams', JSON.stringify(newDoc.params));
+              }
+              if (newDoc.demanda_m3) {
+                setDemandaDiariaM3(newDoc.demanda_m3);
+                localStorage.setItem('demandaDiaria_m3', JSON.stringify(newDoc.demanda_m3));
+              }
+              if (newDoc.demanda_pcs) {
+                setDemandaDiariaPcs(newDoc.demanda_pcs);
+                localStorage.setItem('demandaDiaria_pcs', JSON.stringify(newDoc.demanda_pcs));
+              }
+            }
           }
         }
       )
@@ -280,7 +277,7 @@ function App() {
     return () => {
       client.removeChannel(channel);
     };
-  }, [isInitialLoadDone]);
+  }, [isInitialLoadDone, isDirty, syncStatus]);
 
   // Distribute collaborators to teams based on the configured memberCount
   const applyTeamsToColaboradores = (colabs: Colaborador[], newTeams: TeamConfig[], startDay: number, dias: number): Colaborador[] => {
