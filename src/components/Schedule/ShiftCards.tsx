@@ -28,6 +28,16 @@ export const ShiftCards: React.FC<ShiftCardsProps> = ({ horasSemanais, cenario }
 
   const dynamicShifts: ShiftDefinition[] = [
     {
+      id: 'T3',
+      name: '3º Turno (T3)',
+      entrada: details.t3.entrada,
+      saida: details.t3.saida,
+      permanencia: details.t3.permanencia,
+      jornada: details.t3.jornada,
+      cor: 'border-purple-500 bg-purple-50/30 text-purple-700 dark:bg-purple-950/20 dark:text-purple-400',
+      observacao: 'Aplica Hora Noturna Reduzida (52m30s).',
+    },
+    {
       id: 'T1',
       name: '1º Turno (T1)',
       entrada: details.t1.entrada,
@@ -46,16 +56,6 @@ export const ShiftCards: React.FC<ShiftCardsProps> = ({ horasSemanais, cenario }
       jornada: details.t2.jornada,
       cor: 'border-orange-500 bg-orange-50/30 text-orange-700 dark:bg-orange-950/20 dark:text-orange-400',
       observacao: 'Pico de expedição vespertina/noturna.',
-    },
-    {
-      id: 'T3',
-      name: '3º Turno (T3)',
-      entrada: details.t3.entrada,
-      saida: details.t3.saida,
-      permanencia: details.t3.permanencia,
-      jornada: details.t3.jornada,
-      cor: 'border-purple-500 bg-purple-50/30 text-purple-700 dark:bg-purple-950/20 dark:text-purple-400',
-      observacao: 'Aplica Hora Noturna Reduzida (52m30s).',
     },
   ];
 

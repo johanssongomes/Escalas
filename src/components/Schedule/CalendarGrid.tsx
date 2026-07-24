@@ -266,9 +266,9 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
     groupsMap.get(groupKey)!.members.push(colab);
   });
 
-  // Sort groups: T1 first, then T2, then T3; inside each shift, by team order in config
+  // Sort groups: T3 first, then T1, then T2; inside each shift, by team order in config
   const sortedGroups = Array.from(groupsMap.values()).sort((a, b) => {
-    const shiftOrder: { [key: string]: number } = { '1º Turno (T1)': 1, '2º Turno (T2)': 2, '3º Turno (T3)': 3 };
+    const shiftOrder: { [key: string]: number } = { '3º Turno (T3)': 1, '1º Turno (T1)': 2, '2º Turno (T2)': 3 };
     const orderA = shiftOrder[a.shiftLabel] || 99;
     const orderB = shiftOrder[b.shiftLabel] || 99;
     if (orderA !== orderB) return orderA - orderB;
@@ -284,8 +284,8 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
   // Sorted list for consolidated view mode
   const sortedColaboradoresConsolidated = [...filteredColaboradores].sort((a, b) => {
     if (a.turno !== b.turno) {
-      const orderA = a.turno === 'T1' ? 1 : a.turno === 'T2' ? 2 : 3;
-      const orderB = b.turno === 'T1' ? 1 : b.turno === 'T2' ? 2 : 3;
+      const orderA = a.turno === 'T3' ? 1 : a.turno === 'T1' ? 2 : 3;
+      const orderB = b.turno === 'T3' ? 1 : b.turno === 'T1' ? 2 : 3;
       return orderA - orderB;
     }
     return a.id.localeCompare(b.id);
@@ -500,7 +500,7 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
                   {selectedShifts.length === 3 ? 'Nenhum' : 'Todos'}
                 </button>
                 <div className="h-3 w-[1px] bg-slate-350 dark:bg-slate-700 mx-0.5" />
-                {['T1', 'T2', 'T3'].map((shift) => {
+                {['T3', 'T1', 'T2'].map((shift) => {
                   const isActive = selectedShifts.includes(shift);
                   const label = shift === 'T1' ? '1º Turno' : shift === 'T2' ? '2º Turno' : '3º Turno';
                   return (
@@ -864,675 +864,240 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
                     );
                   })()}
                 </div>
-              </td>
-            </tr>
+              {/* Shift Summary Groups */}
+            {['T3', 'T1', 'T2'].map((shift) => {
+              if (!selectedShifts.includes(shift)) return null;
 
-            {/* T1 Summary Group */}
-            {selectedShifts.includes('T1') && (
-              <>
-                {/* Visual Shift Header */}
-                <tr 
-                  onClick={() => toggleSummaryPanel('T1')}
-                  className="bg-slate-50 dark:bg-slate-950 text-[9px] font-extrabold border-t-2 border-slate-200 dark:border-slate-800 cursor-pointer select-none"
-                >
-                  <td colSpan={diasCount + 2} className="p-1.5 px-3 text-white bg-emerald-600 dark:bg-emerald-700 border-l-4 border-slate-800 shadow-sm">
-                    <span className="sticky left-3 z-10 flex items-center gap-1.5">
-                      {collapsedSummaryPanels.includes('T1') ? (
-                        <ChevronRight className="w-3.5 h-3.5 text-white" />
-                      ) : (
-                        <ChevronDown className="w-3.5 h-3.5 text-white" />
-                      )}
-                      <span>PAINEL DE TOTAIS: 1º TURNO (T1)</span>
-                    </span>
-                  </td>
-                </tr>
-                {!collapsedSummaryPanels.includes('T1') && (
-                <>
-                <tr className="hover:bg-slate-50/50 transition">
-                  <td className="p-1 sticky left-0 z-20 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 font-bold text-[9px] shadow-sm text-slate-700 dark:text-slate-300">
-                    Ativos T1
-                  </td>
-                  {Array.from({ length: diasCount }).map((_, d) => {
-                    const count = colaboradores.filter(c => c.turno === 'T1' && c.escala[d] === 'WORK').length;
-                    const isSun = d % 7 === 6;
-                    const isSat = d % 7 === 5;
-                    return (
-                      <td
-                        key={d}
-                        className={`p-0.5 text-center text-[9px] font-black text-slate-700 dark:text-slate-300 ${
-                          isSun 
-                            ? 'border-r-2 border-slate-300 dark:border-slate-700' 
-                            : isSat
-                              ? 'border-r border-slate-200 dark:border-slate-800'
-                              : 'border-r border-slate-200 dark:border-slate-800'
-                        }`}
-                      >
-                        {count}
-                      </td>
-                    );
-                  })}
-                  {/* Summary Cell */}
-                  <td className="p-0.5 text-center text-[9px] font-bold bg-slate-50/40 dark:bg-slate-900/20 border-l border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300">
-                    <div className="flex flex-col items-center">
-                      <span>{Math.round(Array.from({ length: diasCount }).map((_, d) => colaboradores.filter(c => c.turno === 'T1' && c.escala[d] === 'WORK').length).reduce((a, b) => a + b, 0) / diasCount)}</span>
-                      <span className="text-[6.5px] text-slate-400 font-normal">Média</span>
-                    </div>
-                  </td>
-                </tr>
-                <tr className="hover:bg-slate-50/50 transition">
-                  <td className="p-1 sticky left-0 z-20 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 font-bold text-[9px] shadow-sm text-slate-700 dark:text-slate-300">
-                    Capac. T1
-                  </td>
-                  {Array.from({ length: diasCount }).map((_, d) => {
-                    const count = colaboradores.filter(c => c.turno === 'T1' && c.escala[d] === 'WORK').length;
-                    const isSun = d % 7 === 6;
-                    const isSat = d % 7 === 5;
-                    return (
-                      <td
-                        key={d}
-                        className={`p-0.5 text-center text-[9px] font-black text-slate-700 dark:text-slate-300 ${
-                          isSun 
-                            ? 'border-r-2 border-slate-300 dark:border-slate-700' 
-                            : isSat
-                              ? 'border-r border-slate-200 dark:border-slate-800'
-                              : 'border-r border-slate-200 dark:border-slate-800'
-                        }`}
-                      >
-                        {count * prodRate}
-                      </td>
-                    );
-                  })}
-                  {/* Summary Cell */}
-                  <td className="p-0.5 text-center text-[9px] font-bold bg-slate-50/40 dark:bg-slate-900/20 border-l border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300">
-                    <div className="flex flex-col items-center">
-                      <span>{(Array.from({ length: diasCount }).map((_, d) => colaboradores.filter(c => c.turno === 'T1' && c.escala[d] === 'WORK').length * prodRate).reduce((a, b) => a + b, 0)).toLocaleString('pt-BR')}</span>
-                      <span className="text-[6.5px] text-slate-400 font-normal">TT</span>
-                    </div>
-                  </td>
-                </tr>
-                <tr className="hover:bg-slate-50/50 transition">
-                  <td className="p-1 sticky left-0 z-20 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 font-bold text-[9px] shadow-sm text-slate-700 dark:text-slate-305">
-                    Demand. T1
-                  </td>
-                  {Array.from({ length: diasCount }).map((_, d) => {
-                    const demand = (demandaDiaria['T1'] && demandaDiaria['T1'][d]) || 0;
-                    const isSun = d % 7 === 6;
-                    const isSat = d % 7 === 5;
-                    return (
-                      <td
-                        key={d}
-                        className={`p-0.5 text-center text-[9px] font-black ${
-                          isSun 
-                            ? 'border-r-2 border-slate-300 dark:border-slate-700' 
-                            : isSat
-                              ? 'border-r border-slate-200 dark:border-slate-800'
-                              : 'border-r border-slate-200 dark:border-slate-800'
-                        }`}
-                      >
-                        <input
-                          type="text"
-                          inputMode="numeric"
-                          pattern="[0-9]*"
-                          value={demand === 0 ? '' : demand}
-                          placeholder="0"
-                          onChange={(e) => {
-                            const val = parseInt(e.target.value.replace(/\D/g, '')) || 0;
-                            handleDemandaChange('T1', d, val);
-                          }}
-                          className="w-full text-center text-[9px] font-extrabold bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded px-0.5 py-0.2 focus:outline-none focus:ring-1 focus:ring-slate-400"
-                        />
-                      </td>
-                    );
-                  })}
-                  {/* Summary Cell */}
-                  <td className="p-0.5 text-center text-[9px] font-bold bg-slate-50/40 dark:bg-slate-900/20 border-l border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300">
-                    <div className="flex flex-col items-center">
-                      <span>{((demandaDiaria['T1'] || []).reduce((a, b) => a + b, 0)).toLocaleString('pt-BR')}</span>
-                      <span className="text-[6.5px] text-slate-400 font-normal">TT</span>
-                    </div>
-                  </td>
-                </tr>
-                <tr className="hover:bg-slate-50/50 transition">
-                  <td className="p-1 sticky left-0 z-20 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 font-bold text-[9px] shadow-sm text-slate-700 dark:text-slate-300">
-                    Saldo T1
-                  </td>
-                  {Array.from({ length: diasCount }).map((_, d) => {
-                    const count = colaboradores.filter(c => c.turno === 'T1' && c.escala[d] === 'WORK').length;
-                    const cap = count * prodRate;
-                    const demand = (demandaDiaria['T1'] && demandaDiaria['T1'][d]) || 0;
-                    const diff = cap - demand;
-                    const isSun = d % 7 === 6;
-                    const isSat = d % 7 === 5;
-                    return (
-                      <td
-                        key={d}
-                        className={`p-0.5 text-center text-[9px] font-black ${
-                          isSun 
-                            ? 'border-r-2 border-slate-300 dark:border-slate-700' 
-                            : isSat
-                              ? 'border-r border-slate-200 dark:border-slate-800'
-                              : 'border-r border-slate-200 dark:border-slate-800'
-                        } ${diff >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500 dark:text-red-400'}`}
-                      >
-                        {diff > 0 ? `+${diff}` : diff}
-                      </td>
-                    );
-                  })}
-                  {/* Summary Cell */}
-                  <td className="p-0.5 text-center text-[9px] font-bold bg-slate-50/40 dark:bg-slate-900/20 border-l border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300">
-                    <div className="flex flex-col items-center">
-                      {(() => {
-                        const totalCap = Array.from({ length: diasCount }).map((_, d) => colaboradores.filter(c => c.turno === 'T1' && c.escala[d] === 'WORK').length * prodRate).reduce((a, b) => a + b, 0);
-                        const totalDem = (demandaDiaria['T1'] || []).reduce((a, b) => a + b, 0);
-                        const totalSal = totalCap - totalDem;
-                        return (
-                          <>
-                            <span className={totalSal >= 0 ? 'text-emerald-600 dark:text-emerald-450' : 'text-red-500 dark:text-red-450'}>
-                              {totalSal > 0 ? `+${totalSal.toLocaleString('pt-BR')}` : totalSal.toLocaleString('pt-BR')}
-                            </span>
-                            <span className="text-[6.5px] text-slate-400 font-normal">SL TT</span>
-                          </>
-                        );
-                      })()}
-                    </div>
-                  </td>
-                </tr>
-                {/* HC +/- Row */}
-                <tr className="bg-slate-50/20 dark:bg-slate-955/20 font-black border-b-2 border-slate-200 dark:border-slate-800 transition">
-                  <td className="p-1 sticky left-0 z-20 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 font-bold text-[9px] shadow-sm text-slate-700 dark:text-slate-300">
-                    Hc +/- T1
-                  </td>
-                  {Array.from({ length: diasCount }).map((_, d) => {
-                    const count = colaboradores.filter(c => c.turno === 'T1' && c.escala[d] === 'WORK').length;
-                    const cap = count * prodRate;
-                    const demand = (demandaDiaria['T1'] && demandaDiaria['T1'][d]) || 0;
-                    const diff = cap - demand;
-                    const hcDiff = Math.round(diff / prodRate);
-                    const isSun = d % 7 === 6;
-                    const isSat = d % 7 === 5;
-                    return (
-                      <td
-                        key={d}
-                        className={`p-0.5 text-center text-[9px] font-black ${
-                          isSun 
-                            ? 'border-r-2 border-slate-300 dark:border-slate-700 bg-slate-50/50' 
-                            : isSat
-                              ? 'border-r border-slate-200 dark:border-slate-800 bg-slate-50/50'
-                              : 'border-r border-slate-200 dark:border-slate-800'
-                        } ${hcDiff >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500 dark:text-red-400'}`}
-                      >
-                        {hcDiff > 0 ? `+${hcDiff}` : hcDiff}
-                      </td>
-                    );
-                  })}
-                  {/* Summary Cell */}
-                  <td className="p-0.5 text-center text-[9px] font-bold bg-slate-50/40 dark:bg-slate-900/20 border-l border-slate-200 dark:border-slate-800 text-slate-750 dark:text-slate-300">
-                    <div className="flex flex-col items-center">
-                      {(() => {
-                        const totalCap = Array.from({ length: diasCount }).map((_, d) => colaboradores.filter(c => c.turno === 'T1' && c.escala[d] === 'WORK').length * prodRate).reduce((a, b) => a + b, 0);
-                        const totalDem = (demandaDiaria['T1'] || []).reduce((a, b) => a + b, 0);
-                        const totalSal = totalCap - totalDem;
-                        const avgHc = Math.round((totalSal / prodRate / diasCount) * 10) / 10;
-                        return (
-                          <>
-                            <span className={avgHc >= 0 ? 'text-emerald-600 dark:text-emerald-450' : 'text-red-500 dark:text-red-450'}>
-                              {avgHc > 0 ? `+${avgHc}` : avgHc}
-                            </span>
-                            <span className="text-[6.5px] text-slate-400 font-normal">Média</span>
-                          </>
-                        );
-                      })()}
-                    </div>
-                  </td>
-                </tr>
-                </>
-                )}
-              </>
-            )}
+              const style = {
+                T1: { bg: 'bg-emerald-600 dark:bg-emerald-700', label: '1º TURNO (T1)', badge: 'Ativos T1', cap: 'Capac. T1', dem: 'Demand. T1', sal: 'Saldo T1', hc: 'Hc +/- T1' },
+                T2: { bg: 'bg-amber-600 dark:bg-amber-700', label: '2º TURNO (T2)', badge: 'Ativos T2', cap: 'Capac. T2', dem: 'Demand. T2', sal: 'Saldo T2', hc: 'Hc +/- T2' },
+                T3: { bg: 'bg-indigo-600 dark:bg-indigo-700', label: '3º TURNO (T3)', badge: 'Ativos T3', cap: 'Capac. T3', dem: 'Demand. T3', sal: 'Saldo T3', hc: 'Hc +/- T3' },
+              }[shift as 'T1' | 'T2' | 'T3'];
 
-            {/* T2 Summary Group */}
-            {selectedShifts.includes('T2') && (
-              <>
-                {/* Visual Shift Header */}
-                <tr 
-                  onClick={() => toggleSummaryPanel('T2')}
-                  className="bg-slate-50 dark:bg-slate-950 text-[9px] font-extrabold border-t-2 border-slate-200 dark:border-slate-800 cursor-pointer select-none"
-                >
-                  <td colSpan={diasCount + 2} className="p-1.5 px-3 text-white bg-amber-600 dark:bg-amber-700 border-l-4 border-slate-800 shadow-sm">
-                    <span className="sticky left-3 z-10 flex items-center gap-1.5">
-                      {collapsedSummaryPanels.includes('T2') ? (
-                        <ChevronRight className="w-3.5 h-3.5 text-white" />
-                      ) : (
-                        <ChevronDown className="w-3.5 h-3.5 text-white" />
-                      )}
-                      <span>PAINEL DE TOTAIS: 2º TURNO (T2)</span>
-                    </span>
-                  </td>
-                </tr>
-                {!collapsedSummaryPanels.includes('T2') && (
-                <>
-                <tr className="hover:bg-slate-50/50 transition">
-                  <td className="p-1 sticky left-0 z-20 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 font-bold text-[9px] shadow-sm text-slate-700 dark:text-slate-300">
-                    Ativos T2
-                  </td>
-                  {Array.from({ length: diasCount }).map((_, d) => {
-                    const count = colaboradores.filter(c => c.turno === 'T2' && c.escala[d] === 'WORK').length;
-                    const isSun = d % 7 === 6;
-                    const isSat = d % 7 === 5;
-                    return (
-                      <td
-                        key={d}
-                        className={`p-0.5 text-center text-[9px] font-black text-slate-700 dark:text-slate-300 ${
-                          isSun 
-                            ? 'border-r-2 border-slate-300 dark:border-slate-700' 
-                            : isSat
-                              ? 'border-r border-slate-200 dark:border-slate-800'
-                              : 'border-r border-slate-200 dark:border-slate-800'
-                        }`}
-                      >
-                        {count}
-                      </td>
-                    );
-                  })}
-                  {/* Summary Cell */}
-                  <td className="p-0.5 text-center text-[9px] font-bold bg-slate-50/40 dark:bg-slate-900/20 border-l border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300">
-                    <div className="flex flex-col items-center">
-                      <span>{Math.round(Array.from({ length: diasCount }).map((_, d) => colaboradores.filter(c => c.turno === 'T2' && c.escala[d] === 'WORK').length).reduce((a, b) => a + b, 0) / diasCount)}</span>
-                      <span className="text-[6.5px] text-slate-400 font-normal">Média</span>
-                    </div>
-                  </td>
-                </tr>
-                <tr className="hover:bg-slate-50/50 transition">
-                  <td className="p-1 sticky left-0 z-20 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 font-bold text-[9px] shadow-sm text-slate-700 dark:text-slate-300">
-                    Capac. T2
-                  </td>
-                  {Array.from({ length: diasCount }).map((_, d) => {
-                    const count = colaboradores.filter(c => c.turno === 'T2' && c.escala[d] === 'WORK').length;
-                    const isSun = d % 7 === 6;
-                    const isSat = d % 7 === 5;
-                    return (
-                      <td
-                        key={d}
-                        className={`p-0.5 text-center text-[9px] font-black text-slate-700 dark:text-slate-300 ${
-                          isSun 
-                            ? 'border-r-2 border-slate-300 dark:border-slate-700' 
-                            : isSat
-                              ? 'border-r border-slate-200 dark:border-slate-800'
-                              : 'border-r border-slate-200 dark:border-slate-800'
-                        }`}
-                      >
-                        {count * prodRate}
-                      </td>
-                    );
-                  })}
-                  {/* Summary Cell */}
-                  <td className="p-0.5 text-center text-[9px] font-bold bg-slate-50/40 dark:bg-slate-900/20 border-l border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300">
-                    <div className="flex flex-col items-center">
-                      <span>{(Array.from({ length: diasCount }).map((_, d) => colaboradores.filter(c => c.turno === 'T2' && c.escala[d] === 'WORK').length * prodRate).reduce((a, b) => a + b, 0)).toLocaleString('pt-BR')}</span>
-                      <span className="text-[6.5px] text-slate-400 font-normal">TT</span>
-                    </div>
-                  </td>
-                </tr>
-                <tr className="hover:bg-slate-50/50 transition">
-                  <td className="p-1 sticky left-0 z-20 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 font-bold text-[9px] shadow-sm text-slate-700 dark:text-slate-305">
-                    Demand. T2
-                  </td>
-                  {Array.from({ length: diasCount }).map((_, d) => {
-                    const demand = (demandaDiaria['T2'] && demandaDiaria['T2'][d]) || 0;
-                    const isSun = d % 7 === 6;
-                    const isSat = d % 7 === 5;
-                    return (
-                      <td
-                        key={d}
-                        className={`p-0.5 text-center text-[9px] font-black ${
-                          isSun 
-                            ? 'border-r-2 border-slate-300 dark:border-slate-700' 
-                            : isSat
-                              ? 'border-r border-slate-200 dark:border-slate-800'
-                              : 'border-r border-slate-200 dark:border-slate-800'
-                        }`}
-                      >
-                        <input
-                          type="text"
-                          inputMode="numeric"
-                          pattern="[0-9]*"
-                          value={demand === 0 ? '' : demand}
-                          placeholder="0"
-                          onChange={(e) => {
-                            const val = parseInt(e.target.value.replace(/\D/g, '')) || 0;
-                            handleDemandaChange('T2', d, val);
-                          }}
-                          className="w-full text-center text-[9px] font-extrabold bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded px-0.5 py-0.2 focus:outline-none focus:ring-1 focus:ring-slate-400"
-                        />
-                      </td>
-                    );
-                  })}
-                  {/* Summary Cell */}
-                  <td className="p-0.5 text-center text-[9px] font-bold bg-slate-50/40 dark:bg-slate-900/20 border-l border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300">
-                    <div className="flex flex-col items-center">
-                      <span>{((demandaDiaria['T2'] || []).reduce((a, b) => a + b, 0)).toLocaleString('pt-BR')}</span>
-                      <span className="text-[6.5px] text-slate-400 font-normal">TT</span>
-                    </div>
-                  </td>
-                </tr>
-                <tr className="hover:bg-slate-50/50 transition">
-                  <td className="p-1 sticky left-0 z-20 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 font-bold text-[9px] shadow-sm text-slate-700 dark:text-slate-300">
-                    Saldo T2
-                  </td>
-                  {Array.from({ length: diasCount }).map((_, d) => {
-                    const count = colaboradores.filter(c => c.turno === 'T2' && c.escala[d] === 'WORK').length;
-                    const cap = count * prodRate;
-                    const demand = (demandaDiaria['T2'] && demandaDiaria['T2'][d]) || 0;
-                    const diff = cap - demand;
-                    const isSun = d % 7 === 6;
-                    const isSat = d % 7 === 5;
-                    return (
-                      <td
-                        key={d}
-                        className={`p-0.5 text-center text-[9px] font-black ${
-                          isSun 
-                            ? 'border-r-2 border-slate-300 dark:border-slate-700' 
-                            : isSat
-                              ? 'border-r border-slate-200 dark:border-slate-800'
-                              : 'border-r border-slate-200 dark:border-slate-800'
-                        } ${diff >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500 dark:text-red-400'}`}
-                      >
-                        {diff > 0 ? `+${diff}` : diff}
-                      </td>
-                    );
-                  })}
-                  {/* Summary Cell */}
-                  <td className="p-0.5 text-center text-[9px] font-bold bg-slate-50/40 dark:bg-slate-900/20 border-l border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300">
-                    <div className="flex flex-col items-center">
-                      {(() => {
-                        const totalCap = Array.from({ length: diasCount }).map((_, d) => colaboradores.filter(c => c.turno === 'T2' && c.escala[d] === 'WORK').length * prodRate).reduce((a, b) => a + b, 0);
-                        const totalDem = (demandaDiaria['T2'] || []).reduce((a, b) => a + b, 0);
-                        const totalSal = totalCap - totalDem;
-                        return (
-                          <>
-                            <span className={totalSal >= 0 ? 'text-emerald-600 dark:text-emerald-450' : 'text-red-500 dark:text-red-455'}>
-                              {totalSal > 0 ? `+${totalSal.toLocaleString('pt-BR')}` : totalSal.toLocaleString('pt-BR')}
-                            </span>
-                            <span className="text-[6.5px] text-slate-400 font-normal">SL TT</span>
-                          </>
-                        );
-                      })()}
-                    </div>
-                  </td>
-                </tr>
-                {/* HC +/- Row */}
-                <tr className="bg-slate-50/20 dark:bg-slate-950/20 font-black border-b-2 border-slate-200 dark:border-slate-800 transition">
-                  <td className="p-1 sticky left-0 z-20 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 font-bold text-[9px] shadow-sm text-slate-700 dark:text-slate-300">
-                    Hc +/- T2
-                  </td>
-                  {Array.from({ length: diasCount }).map((_, d) => {
-                    const count = colaboradores.filter(c => c.turno === 'T2' && c.escala[d] === 'WORK').length;
-                    const cap = count * prodRate;
-                    const demand = (demandaDiaria['T2'] && demandaDiaria['T2'][d]) || 0;
-                    const diff = cap - demand;
-                    const hcDiff = Math.round(diff / prodRate);
-                    const isSun = d % 7 === 6;
-                    const isSat = d % 7 === 5;
-                    return (
-                      <td
-                        key={d}
-                        className={`p-0.5 text-center text-[9px] font-black ${
-                          isSun 
-                            ? 'border-r-2 border-slate-300 dark:border-slate-700 bg-slate-50/50' 
-                            : isSat
-                              ? 'border-r border-slate-200 dark:border-slate-800 bg-slate-50/50'
-                              : 'border-r border-slate-200 dark:border-slate-800'
-                        } ${hcDiff >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500 dark:text-red-400'}`}
-                      >
-                        {hcDiff > 0 ? `+${hcDiff}` : hcDiff}
-                      </td>
-                    );
-                  })}
-                  {/* Summary Cell */}
-                  <td className="p-0.5 text-center text-[9px] font-bold bg-slate-50/40 dark:bg-slate-900/20 border-l border-slate-200 dark:border-slate-800 text-slate-750 dark:text-slate-300">
-                    <div className="flex flex-col items-center">
-                      {(() => {
-                        const totalCap = Array.from({ length: diasCount }).map((_, d) => colaboradores.filter(c => c.turno === 'T2' && c.escala[d] === 'WORK').length * prodRate).reduce((a, b) => a + b, 0);
-                        const totalDem = (demandaDiaria['T2'] || []).reduce((a, b) => a + b, 0);
-                        const totalSal = totalCap - totalDem;
-                        const avgHc = Math.round((totalSal / prodRate / diasCount) * 10) / 10;
-                        return (
-                          <>
-                            <span className={avgHc >= 0 ? 'text-emerald-600 dark:text-emerald-450' : 'text-red-500 dark:text-red-455'}>
-                              {avgHc > 0 ? `+${avgHc}` : avgHc}
-                            </span>
-                            <span className="text-[6.5px] text-slate-400 font-normal">Média</span>
-                          </>
-                        );
-                      })()}
-                    </div>
-                  </td>
-                </tr>
-                </>
-                )}
-              </>
-            )}
+              const isCollapsed = collapsedSummaryPanels.includes(shift);
 
-            {/* T3 Summary Group */}
-            {selectedShifts.includes('T3') && (
-              <>
-                {/* Visual Shift Header */}
-                <tr 
-                  onClick={() => toggleSummaryPanel('T3')}
-                  className="bg-slate-50 dark:bg-slate-950 text-[9px] font-extrabold border-t-2 border-slate-200 dark:border-slate-800 cursor-pointer select-none"
-                >
-                  <td colSpan={diasCount + 2} className="p-1.5 px-3 text-white bg-indigo-600 dark:bg-indigo-700 border-l-4 border-slate-800 shadow-sm animate-none">
-                    <span className="sticky left-3 z-10 flex items-center gap-1.5">
-                      {collapsedSummaryPanels.includes('T3') ? (
-                        <ChevronRight className="w-3.5 h-3.5 text-white" />
-                      ) : (
-                        <ChevronDown className="w-3.5 h-3.5 text-white" />
-                      )}
-                      <span>PAINEL DE TOTAIS: 3º TURNO (T3)</span>
-                    </span>
-                  </td>
-                </tr>
-                {!collapsedSummaryPanels.includes('T3') && (
-                <>
-                <tr className="hover:bg-slate-50/50 transition">
-                  <td className="p-1 sticky left-0 z-20 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 font-bold text-[9px] shadow-sm text-slate-700 dark:text-slate-300">
-                    Ativos T3
-                  </td>
-                  {Array.from({ length: diasCount }).map((_, d) => {
-                    const count = colaboradores.filter(c => c.turno === 'T3' && c.escala[d] === 'WORK').length;
-                    const isSun = d % 7 === 6;
-                    const isSat = d % 7 === 5;
-                    return (
-                      <td
-                        key={d}
-                        className={`p-0.5 text-center text-[9px] font-black text-slate-700 dark:text-slate-300 ${
-                          isSun 
-                            ? 'border-r-2 border-slate-300 dark:border-slate-700' 
-                            : isSat
-                              ? 'border-r border-slate-200 dark:border-slate-800'
-                              : 'border-r border-slate-200 dark:border-slate-800'
-                        }`}
-                      >
-                        {count}
-                      </td>
-                    );
-                  })}
-                  {/* Summary Cell */}
-                  <td className="p-0.5 text-center text-[9px] font-bold bg-slate-50/40 dark:bg-slate-900/20 border-l border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300">
-                    <div className="flex flex-col items-center">
-                      <span>{Math.round(Array.from({ length: diasCount }).map((_, d) => colaboradores.filter(c => c.turno === 'T3' && c.escala[d] === 'WORK').length).reduce((a, b) => a + b, 0) / diasCount)}</span>
-                      <span className="text-[6.5px] text-slate-400 font-normal">Média</span>
-                    </div>
-                  </td>
-                </tr>
-                <tr className="hover:bg-slate-50/50 transition">
-                  <td className="p-1 sticky left-0 z-20 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 font-bold text-[9px] shadow-sm text-slate-700 dark:text-slate-300">
-                    Capac. T3
-                  </td>
-                  {Array.from({ length: diasCount }).map((_, d) => {
-                    const count = colaboradores.filter(c => c.turno === 'T3' && c.escala[d] === 'WORK').length;
-                    const isSun = d % 7 === 6;
-                    const isSat = d % 7 === 5;
-                    return (
-                      <td
-                        key={d}
-                        className={`p-0.5 text-center text-[9px] font-black text-slate-700 dark:text-slate-300 ${
-                          isSun 
-                            ? 'border-r-2 border-slate-300 dark:border-slate-700' 
-                            : isSat
-                              ? 'border-r border-slate-200 dark:border-slate-800'
-                              : 'border-r border-slate-200 dark:border-slate-800'
-                        }`}
-                      >
-                        {count * prodRate}
-                      </td>
-                    );
-                  })}
-                  {/* Summary Cell */}
-                  <td className="p-0.5 text-center text-[9px] font-bold bg-slate-50/40 dark:bg-slate-900/20 border-l border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300">
-                    <div className="flex flex-col items-center">
-                      <span>{(Array.from({ length: diasCount }).map((_, d) => colaboradores.filter(c => c.turno === 'T3' && c.escala[d] === 'WORK').length * prodRate).reduce((a, b) => a + b, 0)).toLocaleString('pt-BR')}</span>
-                      <span className="text-[6.5px] text-slate-400 font-normal">TT</span>
-                    </div>
-                  </td>
-                </tr>
-                <tr className="hover:bg-slate-50/50 transition">
-                  <td className="p-1 sticky left-0 z-20 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 font-bold text-[9px] shadow-sm text-slate-700 dark:text-slate-305">
-                    Demand. T3
-                  </td>
-                  {Array.from({ length: diasCount }).map((_, d) => {
-                    const demand = (demandaDiaria['T3'] && demandaDiaria['T3'][d]) || 0;
-                    const isSun = d % 7 === 6;
-                    const isSat = d % 7 === 5;
-                    return (
-                      <td
-                        key={d}
-                        className={`p-0.5 text-center text-[9px] font-black ${
-                          isSun 
-                            ? 'border-r-2 border-slate-300 dark:border-slate-700' 
-                            : isSat
-                              ? 'border-r border-slate-200 dark:border-slate-800'
-                              : 'border-r border-slate-200 dark:border-slate-800'
-                        }`}
-                      >
-                        <input
-                          type="text"
-                          inputMode="numeric"
-                          pattern="[0-9]*"
-                          value={demand === 0 ? '' : demand}
-                          placeholder="0"
-                          onChange={(e) => {
-                            const val = parseInt(e.target.value.replace(/\D/g, '')) || 0;
-                            handleDemandaChange('T3', d, val);
-                          }}
-                          className="w-full text-center text-[9px] font-extrabold bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded px-0.5 py-0.2 focus:outline-none focus:ring-1 focus:ring-slate-400"
-                        />
-                      </td>
-                    );
-                  })}
-                  {/* Summary Cell */}
-                  <td className="p-0.5 text-center text-[9px] font-bold bg-slate-50/40 dark:bg-slate-900/20 border-l border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300">
-                    <div className="flex flex-col items-center">
-                      <span>{((demandaDiaria['T3'] || []).reduce((a, b) => a + b, 0)).toLocaleString('pt-BR')}</span>
-                      <span className="text-[6.5px] text-slate-400 font-normal">TT</span>
-                    </div>
-                  </td>
-                </tr>
-                <tr className="hover:bg-slate-50/50 transition">
-                  <td className="p-1 sticky left-0 z-20 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 font-bold text-[9px] shadow-sm text-slate-700 dark:text-slate-300">
-                    Saldo T3
-                  </td>
-                  {Array.from({ length: diasCount }).map((_, d) => {
-                    const count = colaboradores.filter(c => c.turno === 'T3' && c.escala[d] === 'WORK').length;
-                    const cap = count * prodRate;
-                    const demand = (demandaDiaria['T3'] && demandaDiaria['T3'][d]) || 0;
-                    const diff = cap - demand;
-                    const isSun = d % 7 === 6;
-                    const isSat = d % 7 === 5;
-                    return (
-                      <td
-                        key={d}
-                        className={`p-0.5 text-center text-[9px] font-black ${
-                          isSun 
-                            ? 'border-r-2 border-slate-300 dark:border-slate-700' 
-                            : isSat
-                              ? 'border-r border-slate-200 dark:border-slate-800'
-                              : 'border-r border-slate-200 dark:border-slate-800'
-                        } ${diff >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500 dark:text-red-400'}`}
-                      >
-                        {diff > 0 ? `+${diff}` : diff}
-                      </td>
-                    );
-                  })}
-                  {/* Summary Cell */}
-                  <td className="p-0.5 text-center text-[9px] font-bold bg-slate-50/40 dark:bg-slate-900/20 border-l border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300">
-                    <div className="flex flex-col items-center">
-                      {(() => {
-                        const totalCap = Array.from({ length: diasCount }).map((_, d) => colaboradores.filter(c => c.turno === 'T3' && c.escala[d] === 'WORK').length * prodRate).reduce((a, b) => a + b, 0);
-                        const totalDem = (demandaDiaria['T3'] || []).reduce((a, b) => a + b, 0);
-                        const totalSal = totalCap - totalDem;
-                        return (
-                          <>
-                            <span className={totalSal >= 0 ? 'text-emerald-600 dark:text-emerald-450' : 'text-red-500 dark:text-red-455'}>
-                              {totalSal > 0 ? `+${totalSal.toLocaleString('pt-BR')}` : totalSal.toLocaleString('pt-BR')}
-                            </span>
-                            <span className="text-[6.5px] text-slate-400 font-normal">SL TT</span>
-                          </>
-                        );
-                      })()}
-                    </div>
-                  </td>
-                </tr>
-                {/* HC +/- Row */}
-                <tr className="bg-slate-50/20 dark:bg-slate-950/20 font-black border-b-2 border-slate-200 dark:border-slate-800 transition">
-                  <td className="p-1 sticky left-0 z-20 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 font-bold text-[9px] shadow-sm text-slate-700 dark:text-slate-300">
-                    Hc +/- T3
-                  </td>
-                  {Array.from({ length: diasCount }).map((_, d) => {
-                    const count = colaboradores.filter(c => c.turno === 'T3' && c.escala[d] === 'WORK').length;
-                    const cap = count * prodRate;
-                    const demand = (demandaDiaria['T3'] && demandaDiaria['T3'][d]) || 0;
-                    const diff = cap - demand;
-                    const hcDiff = Math.round(diff / prodRate);
-                    const isSun = d % 7 === 6;
-                    const isSat = d % 7 === 5;
-                    return (
-                      <td
-                        key={d}
-                        className={`p-0.5 text-center text-[9px] font-black ${
-                          isSun 
-                            ? 'border-r-2 border-slate-300 dark:border-slate-700 bg-slate-50/50' 
-                            : isSat
-                              ? 'border-r border-slate-200 dark:border-slate-800 bg-slate-50/50'
-                              : 'border-r border-slate-200 dark:border-slate-800'
-                        } ${hcDiff >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500 dark:text-red-400'}`}
-                      >
-                        {hcDiff > 0 ? `+${hcDiff}` : hcDiff}
-                      </td>
-                    );
-                  })}
-                  {/* Summary Cell */}
-                  <td className="p-0.5 text-center text-[9px] font-bold bg-slate-50/40 dark:bg-slate-900/20 border-l border-slate-200 dark:border-slate-800 text-slate-750 dark:text-slate-300">
-                    <div className="flex flex-col items-center">
-                      {(() => {
-                        const totalCap = Array.from({ length: diasCount }).map((_, d) => colaboradores.filter(c => c.turno === 'T3' && c.escala[d] === 'WORK').length * prodRate).reduce((a, b) => a + b, 0);
-                        const totalDem = (demandaDiaria['T3'] || []).reduce((a, b) => a + b, 0);
-                        const totalSal = totalCap - totalDem;
-                        const avgHc = Math.round((totalSal / prodRate / diasCount) * 10) / 10;
-                        return (
-                          <>
-                            <span className={avgHc >= 0 ? 'text-emerald-600 dark:text-emerald-450' : 'text-red-500 dark:text-red-455'}>
-                              {avgHc > 0 ? `+${avgHc}` : avgHc}
-                            </span>
+              return (
+                <React.Fragment key={shift}>
+                  {/* Visual Shift Header */}
+                  <tr 
+                    onClick={() => toggleSummaryPanel(shift)}
+                    className="bg-slate-50 dark:bg-slate-950 text-[9px] font-extrabold border-t-2 border-slate-200 dark:border-slate-800 cursor-pointer select-none"
+                  >
+                    <td colSpan={diasCount + 2} className={`p-1.5 px-3 text-white ${style.bg} border-l-4 border-slate-800 shadow-sm`}>
+                      <span className="sticky left-3 z-10 flex items-center gap-1.5">
+                        {isCollapsed ? (
+                          <ChevronRight className="w-3.5 h-3.5 text-white" />
+                        ) : (
+                          <ChevronDown className="w-3.5 h-3.5 text-white" />
+                        )}
+                        <span>PAINEL DE TOTAIS: {style.label}</span>
+                      </span>
+                    </td>
+                  </tr>
+                  {!isCollapsed && (
+                    <>
+                      <tr className="hover:bg-slate-50/50 transition">
+                        <td className="p-1 sticky left-0 z-20 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 font-bold text-[9px] shadow-sm text-slate-700 dark:text-slate-300">
+                          {style.badge}
+                        </td>
+                        {Array.from({ length: diasCount }).map((_, d) => {
+                          const count = colaboradores.filter(c => c.turno === shift && c.escala[d] === 'WORK').length;
+                          const isSun = d % 7 === 6;
+                          const isSat = d % 7 === 5;
+                          return (
+                            <td
+                              key={d}
+                              className={`p-0.5 text-center text-[9px] font-black text-slate-700 dark:text-slate-300 ${
+                                isSun 
+                                  ? 'border-r-2 border-slate-300 dark:border-slate-700' 
+                                  : isSat
+                                    ? 'border-r border-slate-200 dark:border-slate-800'
+                                    : 'border-r border-slate-200 dark:border-slate-800'
+                              }`}
+                            >
+                              {count}
+                            </td>
+                          );
+                        })}
+                        {/* Summary Cell */}
+                        <td className="p-0.5 text-center text-[9px] font-bold bg-slate-50/40 dark:bg-slate-900/20 border-l border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300">
+                          <div className="flex flex-col items-center">
+                            <span>{Math.round(Array.from({ length: diasCount }).map((_, d) => colaboradores.filter(c => c.turno === shift && c.escala[d] === 'WORK').length).reduce((a, b) => a + b, 0) / diasCount)}</span>
                             <span className="text-[6.5px] text-slate-400 font-normal">Média</span>
-                          </>
-                        );
-                      })()}
-                    </div>
-                  </td>
-                </tr>
-                </>
-                )}
+                          </div>
+                        </td>
+                      </tr>
+                      <tr className="hover:bg-slate-50/50 transition">
+                        <td className="p-1 sticky left-0 z-20 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 font-bold text-[9px] shadow-sm text-slate-700 dark:text-slate-300">
+                          {style.cap}
+                        </td>
+                        {Array.from({ length: diasCount }).map((_, d) => {
+                          const count = colaboradores.filter(c => c.turno === shift && c.escala[d] === 'WORK').length;
+                          const isSun = d % 7 === 6;
+                          const isSat = d % 7 === 5;
+                          return (
+                            <td
+                              key={d}
+                              className={`p-0.5 text-center text-[9px] font-black text-slate-700 dark:text-slate-300 ${
+                                isSun 
+                                  ? 'border-r-2 border-slate-300 dark:border-slate-700' 
+                                  : isSat
+                                    ? 'border-r border-slate-200 dark:border-slate-800'
+                                    : 'border-r border-slate-200 dark:border-slate-800'
+                              }`}
+                            >
+                              {count * prodRate}
+                            </td>
+                          );
+                        })}
+                        {/* Summary Cell */}
+                        <td className="p-0.5 text-center text-[9px] font-bold bg-slate-50/40 dark:bg-slate-900/20 border-l border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300">
+                          <div className="flex flex-col items-center">
+                            <span>{(Array.from({ length: diasCount }).map((_, d) => colaboradores.filter(c => c.turno === shift && c.escala[d] === 'WORK').length * prodRate).reduce((a, b) => a + b, 0)).toLocaleString('pt-BR')}</span>
+                            <span className="text-[6.5px] text-slate-400 font-normal">TT</span>
+                          </div>
+                        </td>
+                      </tr>
+                      <tr className="hover:bg-slate-50/50 transition">
+                        <td className="p-1 sticky left-0 z-20 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 font-bold text-[9px] shadow-sm text-slate-700 dark:text-slate-300">
+                          {style.dem}
+                        </td>
+                        {Array.from({ length: diasCount }).map((_, d) => {
+                          const demand = (demandaDiaria[shift] && demandaDiaria[shift][d]) || 0;
+                          const isSun = d % 7 === 6;
+                          const isSat = d % 7 === 5;
+                          return (
+                            <td
+                              key={d}
+                              className={`p-0.5 text-center text-[9px] font-black ${
+                                isSun 
+                                  ? 'border-r-2 border-slate-300 dark:border-slate-700' 
+                                  : isSat
+                                    ? 'border-r border-slate-200 dark:border-slate-800'
+                                    : 'border-r border-slate-200 dark:border-slate-800'
+                              }`}
+                            >
+                              <input
+                                type="text"
+                                inputMode="numeric"
+                                pattern="[0-9]*"
+                                value={demand === 0 ? '' : demand}
+                                placeholder="0"
+                                onChange={(e) => {
+                                  const val = parseInt(e.target.value.replace(/\D/g, '')) || 0;
+                                  handleDemandaChange(shift, d, val);
+                                }}
+                                className="w-full text-center text-[9px] font-extrabold bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded px-0.5 py-0.2 focus:outline-none focus:ring-1 focus:ring-slate-400"
+                              />
+                            </td>
+                          );
+                        })}
+                        {/* Summary Cell */}
+                        <td className="p-0.5 text-center text-[9px] font-bold bg-slate-50/40 dark:bg-slate-900/20 border-l border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300">
+                          <div className="flex flex-col items-center">
+                            <span>{((demandaDiaria[shift] || []).reduce((a, b) => a + b, 0)).toLocaleString('pt-BR')}</span>
+                            <span className="text-[6.5px] text-slate-400 font-normal">TT</span>
+                          </div>
+                        </td>
+                      </tr>
+                      <tr className="hover:bg-slate-50/50 transition">
+                        <td className="p-1 sticky left-0 z-20 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 font-bold text-[9px] shadow-sm text-slate-700 dark:text-slate-300">
+                          {style.sal}
+                        </td>
+                        {Array.from({ length: diasCount }).map((_, d) => {
+                          const count = colaboradores.filter(c => c.turno === shift && c.escala[d] === 'WORK').length;
+                          const cap = count * prodRate;
+                          const demand = (demandaDiaria[shift] && demandaDiaria[shift][d]) || 0;
+                          const diff = cap - demand;
+                          const isSun = d % 7 === 6;
+                          const isSat = d % 7 === 5;
+                          return (
+                            <td
+                              key={d}
+                              className={`p-0.5 text-center text-[9px] font-black ${
+                                isSun 
+                                  ? 'border-r-2 border-slate-300 dark:border-slate-700' 
+                                  : isSat
+                                    ? 'border-r border-slate-200 dark:border-slate-800'
+                                    : 'border-r border-slate-200 dark:border-slate-800'
+                              } ${diff >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500 dark:text-red-400'}`}
+                            >
+                              {diff > 0 ? `+${diff}` : diff}
+                            </td>
+                          );
+                        })}
+                        {/* Summary Cell */}
+                        <td className="p-0.5 text-center text-[9px] font-bold bg-slate-50/40 dark:bg-slate-900/20 border-l border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300">
+                          <div className="flex flex-col items-center">
+                            {(() => {
+                              const totalCap = Array.from({ length: diasCount }).map((_, d) => colaboradores.filter(c => c.turno === shift && c.escala[d] === 'WORK').length * prodRate).reduce((a, b) => a + b, 0);
+                              const totalDem = (demandaDiaria[shift] || []).reduce((a, b) => a + b, 0);
+                              const totalSal = totalCap - totalDem;
+                              return (
+                                <>
+                                  <span className={totalSal >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500 dark:text-red-400'}>
+                                    {totalSal > 0 ? `+${totalSal.toLocaleString('pt-BR')}` : totalSal.toLocaleString('pt-BR')}
+                                  </span>
+                                  <span className="text-[6.5px] text-slate-400 font-normal">SL TT</span>
+                                </>
+                              );
+                            })()}
+                          </div>
+                        </td>
+                      </tr>
+                      {/* HC +/- Row */}
+                      <tr className="bg-slate-50/20 dark:bg-slate-950/20 font-black border-b-2 border-slate-200 dark:border-slate-800 transition">
+                        <td className="p-1 sticky left-0 z-20 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 font-bold text-[9px] shadow-sm text-slate-700 dark:text-slate-300">
+                          {style.hc}
+                        </td>
+                        {Array.from({ length: diasCount }).map((_, d) => {
+                          const count = colaboradores.filter(c => c.turno === shift && c.escala[d] === 'WORK').length;
+                          const cap = count * prodRate;
+                          const demand = (demandaDiaria[shift] && demandaDiaria[shift][d]) || 0;
+                          const diff = cap - demand;
+                          const hcDiff = Math.round(diff / prodRate);
+                          const isSun = d % 7 === 6;
+                          const isSat = d % 7 === 5;
+                          return (
+                            <td
+                              key={d}
+                              className={`p-0.5 text-center text-[9px] font-black ${
+                                isSun 
+                                  ? 'border-r-2 border-slate-300 dark:border-slate-700 bg-slate-50/50' 
+                                  : isSat
+                                    ? 'border-r border-slate-200 dark:border-slate-800 bg-slate-50/50'
+                                    : 'border-r border-slate-200 dark:border-slate-800'
+                              } ${hcDiff >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500 dark:text-red-400'}`}
+                            >
+                              {hcDiff > 0 ? `+${hcDiff}` : hcDiff}
+                            </td>
+                          );
+                        })}
+                        {/* Summary Cell */}
+                        <td className="p-0.5 text-center text-[9px] font-bold bg-slate-50/40 dark:bg-slate-900/20 border-l border-slate-200 dark:border-slate-800 text-slate-750 dark:text-slate-300">
+                          <div className="flex flex-col items-center">
+                            {(() => {
+                              const totalCap = Array.from({ length: diasCount }).map((_, d) => colaboradores.filter(c => c.turno === shift && c.escala[d] === 'WORK').length * prodRate).reduce((a, b) => a + b, 0);
+                              const totalDem = (demandaDiaria[shift] || []).reduce((a, b) => a + b, 0);
+                              const totalSal = totalCap - totalDem;
+                              const avgHc = Math.round((totalSal / prodRate / diasCount) * 10) / 10;
+                              return (
+                                <>
+                                  <span className={avgHc >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500 dark:text-red-400'}>
+                                    {avgHc > 0 ? `+${avgHc}` : avgHc}
+                                  </span>
+                                  <span className="text-[6.5px] text-slate-400 font-normal">Média</span>
+                                </>
+                              );
+                            })()}
+                          </div>
+                        </td>
+                      </tr>
+                    </>
+                  )}
+                </React.Fragment>
+              );
+            })}            )}
               </>
             )}
 
