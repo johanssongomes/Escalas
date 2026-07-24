@@ -13,6 +13,10 @@ export const CoverageTable: React.FC<CoverageTableProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<'daily' | 'weekly'>('daily');
 
+  const formatCell = (val: number) => {
+    return val === -1 ? '—' : `${val} colabs`;
+  };
+
   return (
     <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 shadow-sm mb-8">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 pb-4 border-b border-slate-100 dark:border-slate-800">
@@ -132,13 +136,13 @@ export const CoverageTable: React.FC<CoverageTableProps> = ({
               {weeklyCoverage.map((week) => (
                 <tr key={week.semana} className="hover:bg-slate-50/50 dark:hover:bg-slate-850/50">
                   <td className="p-3 font-bold text-slate-700 dark:text-slate-300">{week.semana}</td>
-                  <td className="p-3 text-center font-semibold">{week.seg} colabs</td>
-                  <td className="p-3 text-center font-semibold">{week.ter} colabs</td>
-                  <td className="p-3 text-center font-semibold">{week.qua} colabs</td>
-                  <td className="p-3 text-center font-semibold">{week.qui} colabs</td>
-                  <td className="p-3 text-center font-semibold">{week.sex} colabs</td>
-                  <td className="p-3 text-center font-bold bg-blue-50/30 dark:bg-blue-950/10 text-blue-700 dark:text-blue-400">{week.sab} colabs</td>
-                  <td className="p-3 text-center font-bold bg-purple-50/30 dark:bg-purple-950/10 text-purple-700 dark:text-purple-400">{week.dom} colabs</td>
+                  <td className="p-3 text-center font-semibold">{formatCell(week.seg)}</td>
+                  <td className="p-3 text-center font-semibold">{formatCell(week.ter)}</td>
+                  <td className="p-3 text-center font-semibold">{formatCell(week.qua)}</td>
+                  <td className="p-3 text-center font-semibold">{formatCell(week.qui)}</td>
+                  <td className="p-3 text-center font-semibold">{formatCell(week.sex)}</td>
+                  <td className="p-3 text-center font-bold bg-blue-50/30 dark:bg-blue-950/10 text-blue-700 dark:text-blue-400">{formatCell(week.sab)}</td>
+                  <td className="p-3 text-center font-bold bg-purple-50/30 dark:bg-purple-950/10 text-purple-700 dark:text-purple-400">{formatCell(week.dom)}</td>
                 </tr>
               ))}
             </tbody>

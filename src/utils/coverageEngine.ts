@@ -36,26 +36,29 @@ export function calculateDailyCoverage(colaboradores: Colaborador[], diasCount: 
   return coverageDays;
 }
 
-export function calculateWeeklyCoverage(coverageDays: CoverageDay[]): WeeklyCoverage[] {
+export function calculateWeeklyCoverage(coverageDays: CoverageDay[], startDayOfWeek: number): WeeklyCoverage[] {
   const weeks: WeeklyCoverage[] = [];
-  const numWeeks = Math.ceil(coverageDays.length / 7);
+  const totalDays = coverageDays.length;
+  const totalCalendarWeeks = Math.ceil((startDayOfWeek + totalDays) / 7);
 
-  for (let w = 0; w < numWeeks; w++) {
-    const startIdx = w * 7;
-    const getVal = (offset: number) => {
-      const day = coverageDays[startIdx + offset];
-      return day ? day.total : 0;
+  for (let w = 0; w < totalCalendarWeeks; w++) {
+    const getValForWeekday = (weekdayIdx: number) => {
+      const dayIdx = w * 7 + weekdayIdx - startDayOfWeek;
+      if (dayIdx >= 0 && dayIdx < totalDays) {
+        return coverageDays[dayIdx].total;
+      }
+      return -1; // -1 indicates non-existent day in the calendar month
     };
 
     weeks.push({
       semana: `Semana ${w + 1}`,
-      seg: getVal(0),
-      ter: getVal(1),
-      qua: getVal(2),
-      qui: getVal(3),
-      sex: getVal(4),
-      sab: getVal(5),
-      dom: getVal(6),
+      seg: getValForWeekday(0),
+      ter: getValForWeekday(1),
+      qua: getValForWeekday(2),
+      qui: getValForWeekday(3),
+      sex: getValForWeekday(4),
+      sab: getValForWeekday(5),
+      dom: getValForWeekday(6),
     });
   }
 

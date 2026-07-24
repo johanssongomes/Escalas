@@ -63,6 +63,17 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
   const [viewMode, setViewMode] = useState<'grouped' | 'consolidated'>('grouped');
   // State holds array of collapsed group keys
   const [collapsedGroups, setCollapsedGroups] = useState<string[]>([]);
+  // State holds array of collapsed summary panel keys (T1, T2, T3, CONSOLIDADO)
+  const [collapsedSummaryPanels, setCollapsedSummaryPanels] = useState<string[]>([]);
+
+  const toggleSummaryPanel = (key: string) => {
+    if (collapsedSummaryPanels.includes(key)) {
+      setCollapsedSummaryPanels(collapsedSummaryPanels.filter(p => p !== key));
+    } else {
+      setCollapsedSummaryPanels([...collapsedSummaryPanels, key]);
+    }
+  };
+
   // Productivity rate (m³ per collaborator per day)
   const [prodRate, setProdRate] = useState<number>(25);
   // Team manager modal
@@ -120,28 +131,6 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
     };
   }, [colaboradores, params, prodRate, diasCount, selectedShifts]);
 
-  const shiftStats = useMemo(() => {
-    const stats: Record<string, { worked: number; off: number; count: number }> = {
-      T1: { worked: 0, off: 0, count: 0 },
-      T2: { worked: 0, off: 0, count: 0 },
-      T3: { worked: 0, off: 0, count: 0 },
-    };
-
-    colaboradores.forEach(c => {
-      if (stats[c.turno]) {
-        stats[c.turno].count++;
-        c.escala.forEach(status => {
-          if (status === 'WORK') {
-            stats[c.turno].worked++;
-          } else {
-            stats[c.turno].off++;
-          }
-        });
-      }
-    });
-
-    return stats;
-  }, [colaboradores]);
 
   const toggleShift = (shift: string) => {
     if (selectedShifts.includes(shift)) {
@@ -480,25 +469,7 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
               </div>
             </div>
 
-            {/* Legend */}
-            <div className="flex items-center gap-3 bg-slate-50 dark:bg-slate-900/40 px-3 py-1 rounded-xl border border-slate-100 dark:border-slate-800/80">
-              <div className="flex items-center gap-1 text-[9px] font-bold text-slate-500">
-                <span className="w-3.5 h-3.5 rounded bg-emerald-600 text-[8px] font-black text-white flex items-center justify-center">T1</span>
-                <span>1º Turno</span>
-              </div>
-              <div className="flex items-center gap-1 text-[9px] font-bold text-slate-500">
-                <span className="w-3.5 h-3.5 rounded bg-amber-500 text-[8px] font-black text-white flex items-center justify-center">T2</span>
-                <span>2º Turno</span>
-              </div>
-              <div className="flex items-center gap-1 text-[9px] font-bold text-slate-500">
-                <span className="w-3.5 h-3.5 rounded bg-indigo-600 text-[8px] font-black text-white flex items-center justify-center">T3</span>
-                <span>3º Turno</span>
-              </div>
-              <div className="flex items-center gap-1 text-[9px] font-bold text-slate-500">
-                <span className="w-3.5 h-3.5 rounded bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-[8.5px] font-black text-slate-400 dark:text-slate-600 flex items-center justify-center">F</span>
-                <span>Folga</span>
-              </div>
-            </div>
+
           </div>
         </div>
       </div>
@@ -507,7 +478,7 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
       {/* Painel de Capacidade & Produtividade */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6 noprint">
         {/* Card 1: Meta de Produtividade */}
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-5 shadow-sm flex flex-col justify-between">
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-4 shadow-sm flex flex-col justify-between">
           <div>
             <div className="flex items-center gap-2 mb-1">
               <span className="p-1 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
@@ -531,7 +502,7 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
         </div>
 
         {/* Card 2: Capacidade Teórica */}
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-5 shadow-sm flex flex-col justify-between">
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-4 shadow-sm flex flex-col justify-between">
           <div>
             <h5 className="text-[9px] font-black text-slate-450 dark:text-slate-555 uppercase tracking-wider">Capacidade Teórica</h5>
             <div className="flex items-baseline gap-1 mt-3">
@@ -545,33 +516,12 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
         </div>
 
         {/* Card 3: Capacidade com Folgas */}
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-5 shadow-sm flex flex-col justify-between">
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-4 shadow-sm flex flex-col justify-between">
           <div>
             <h5 className="text-[9px] font-black text-slate-450 dark:text-slate-555 uppercase tracking-wider">Capacidade com Folgas</h5>
             <div className="flex items-baseline gap-1 mt-3">
               <span className="text-3xl font-black text-blue-600 dark:text-blue-400">{capacityStats.capacidadeReal.toLocaleString('pt-BR')}</span>
               <span className="text-xs font-bold text-blue-400">m³</span>
-            </div>
-
-            {/* Worked and Off Days Breakdown */}
-            <div className="mt-3 pt-2.5 border-t border-slate-100 dark:border-slate-800/80 space-y-2 text-[9.5px]">
-              {selectedShifts.map(shift => {
-                const data = shiftStats[shift];
-                if (!data || data.count === 0) return null;
-                const avgWorked = (data.worked / data.count).toFixed(1);
-                const avgOff = (data.off / data.count).toFixed(1);
-                return (
-                  <div key={shift} className="flex flex-col text-slate-500 dark:text-slate-400">
-                    <div className="flex justify-between font-bold">
-                      <span className="text-slate-700 dark:text-slate-350">{shift === 'T1' ? '1º Turno' : shift === 'T2' ? '2º Turno' : '3º Turno'}:</span>
-                      <span className="text-slate-800 dark:text-slate-200">{data.worked} prod. / {data.off} perdas</span>
-                    </div>
-                    <div className="text-[8px] text-slate-400 text-right">
-                      (Média: {avgWorked} prod. | {avgOff} perdas por colab.)
-                    </div>
-                  </div>
-                );
-              })}
             </div>
           </div>
           <div className="flex items-center gap-1.5 text-[9px] text-emerald-600 dark:text-emerald-400 font-bold mt-4 pt-2 border-t border-slate-100 dark:border-slate-800/50">
@@ -581,7 +531,7 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
         </div>
 
         {/* Card 4: Perda de Capacidade */}
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-5 shadow-sm flex flex-col justify-between">
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-4 shadow-sm flex flex-col justify-between">
           <div>
             <h5 className="text-[9px] font-black text-slate-450 dark:text-slate-555 uppercase tracking-wider">Perda de Capacidade</h5>
             <div className="flex items-baseline gap-1.5 mt-3">
@@ -679,22 +629,85 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
                       onClick={() => toggleGroupCollapse(group.key)}
                       className="bg-slate-50/50 dark:bg-slate-900/30 text-[9px] font-extrabold text-slate-600 dark:text-slate-300 hover:bg-slate-100/60 dark:hover:bg-slate-900/60 transition cursor-pointer select-none"
                     >
-                      <td colSpan={diasCount + 2} className="p-1.5 px-3 border-y border-slate-200/60 dark:border-slate-800/80 ">
-                        <div className="sticky left-3 z-10 flex items-center gap-2">
-                          {isCollapsed ? (
-                            <ChevronRight className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                          ) : (
+                      {isCollapsed ? (
+                        <>
+                          {/* Collapsed Header: First Cell */}
+                          <td className="p-1 sticky left-0 z-20 bg-slate-50 dark:bg-slate-900 border-r border-b border-slate-200 dark:border-slate-800 font-bold text-slate-800 dark:text-slate-200 shadow-sm">
+                            <div className="flex items-center gap-1.5 text-[9px] overflow-hidden">
+                              <ChevronRight className="w-3 h-3 text-slate-400 shrink-0" />
+                              <span className={`px-1.5 py-0.5 rounded font-black text-white text-[8.5px] shrink-0 ${TEAM_COLOR_MAP[group.teamColorKey]?.badge || 'bg-slate-600'}`}>
+                                {group.teamLabel}
+                              </span>
+                              <span className={`text-[7.5px] px-1 py-0.2 rounded font-black text-white uppercase shrink-0 ${
+                                group.members[0]?.turno === 'T1' 
+                                  ? 'bg-emerald-600'
+                                  : group.members[0]?.turno === 'T2'
+                                    ? 'bg-amber-600'
+                                    : 'bg-indigo-600'
+                              }`}>
+                                {group.members[0]?.turno}
+                              </span>
+                            </div>
+                          </td>
+
+                          {/* Collapsed Header: Daily Counts */}
+                          {Array.from({ length: diasCount }).map((_, d) => {
+                            const count = group.members.filter(c => c.escala[d] === 'WORK').length;
+                            const dayOfWeek = (startDayOfWeek + d) % 7;
+                            const isSun = dayOfWeek === 6;
+                            const isSat = dayOfWeek === 5;
+                            
+                            return (
+                              <td
+                                key={d}
+                                className={`p-0.5 text-center text-[9px] font-black bg-slate-50/20 dark:bg-slate-900/10 text-slate-700 dark:text-slate-300 border-b border-slate-200 dark:border-slate-800 ${
+                                  isSun 
+                                    ? 'border-r-2 border-slate-350 dark:border-slate-700' 
+                                    : isSat 
+                                      ? 'border-r border-slate-200 dark:border-slate-800' 
+                                      : 'border-r border-slate-200 dark:border-slate-800'
+                                }`}
+                              >
+                                <div className="flex justify-center">
+                                  {count > 0 ? (
+                                    <span className={`w-[19px] h-[19px] rounded-full flex items-center justify-center font-black text-[9px] text-white shadow-sm ${
+                                      TEAM_COLOR_MAP[group.teamColorKey]?.badge || 'bg-slate-600'
+                                    }`}>
+                                      {count}
+                                    </span>
+                                  ) : (
+                                    <span className="w-[19px] h-[19px] flex items-center justify-center text-slate-300 dark:text-slate-700 font-normal">
+                                      0
+                                    </span>
+                                  )}
+                                </div>
+                              </td>
+                            );
+                          })}
+
+                          {/* Collapsed Header: Summary Cell */}
+                          <td className="p-0.5 text-center text-[9px] font-black bg-slate-100/30 dark:bg-slate-900/40 border-l border-b border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400">
+                            <div className="flex flex-col items-center">
+                              <span>{group.members.length}</span>
+                              <span className="text-[6.5px] text-slate-450 font-normal leading-none mt-0.5">Colab</span>
+                            </div>
+                          </td>
+                        </>
+                      ) : (
+                        /* Expanded Header: Single colSpan Cell */
+                        <td colSpan={diasCount + 2} className="p-1.5 px-3 border-y border-slate-200/60 dark:border-slate-800/80 ">
+                          <div className="sticky left-3 z-10 flex items-center gap-2">
                             <ChevronDown className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                          )}
-                          <span className="text-slate-800 dark:text-slate-200">{group.shiftLabel}</span>
-                          <span className="h-3 w-[1px] bg-slate-300 dark:bg-slate-700"></span>
-                          <span className={`px-1.5 py-0.5 rounded text-[8px] uppercase font-black text-white ${TEAM_COLOR_MAP[group.teamColorKey]?.badge || 'bg-slate-600'}`}>
-                            {group.teamLabel}
-                          </span>
-                          <span className="text-slate-400 font-normal">({group.teamDesc})</span>
-                          <span className="ml-auto text-slate-400 font-medium">{group.members.length} colaboradores</span>
-                        </div>
-                      </td>
+                            <span className="text-slate-800 dark:text-slate-200">{group.shiftLabel}</span>
+                            <span className="h-3 w-[1px] bg-slate-300 dark:bg-slate-700"></span>
+                            <span className={`px-1.5 py-0.5 rounded text-[8px] uppercase font-black text-white ${TEAM_COLOR_MAP[group.teamColorKey]?.badge || 'bg-slate-600'}`}>
+                              {group.teamLabel}
+                            </span>
+                            <span className="text-slate-400 font-normal">({group.teamDesc})</span>
+                            <span className="ml-auto text-slate-400 font-medium">{group.members.length} colaboradores</span>
+                          </div>
+                        </td>
+                      )}
                     </tr>
 
                     {/* Group Members Rows */}
@@ -706,15 +719,85 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
               sortedColaboradoresConsolidated.map((colab) => renderColaboradorRow(colab))
             )}
 
+            {/* Nível de Cobertura Diária Row */}
+            <tr className="bg-slate-50/50 dark:bg-slate-900/40 border-t-2 border-b border-slate-200 dark:border-slate-800 transition">
+              <td className="p-1 sticky left-0 z-20 bg-slate-50 dark:bg-slate-900 border-r border-b border-slate-200 dark:border-slate-800 font-black text-[9px] shadow-sm text-slate-700 dark:text-slate-300 uppercase tracking-wider">
+                Cobertura %
+              </td>
+              {Array.from({ length: diasCount }).map((_, d) => {
+                const activeCount = colaboradores.filter(c => c.escala[d] === 'WORK').length;
+                const totalColabs = colaboradores.length;
+                const pct = totalColabs > 0 ? Math.round((activeCount / totalColabs) * 100) : 0;
+                
+                const isSun = d % 7 === 6;
+                const isSat = d % 7 === 5;
+                
+                // Color coding based on heatmap thresholds
+                let colorClass = 'text-emerald-700 dark:text-emerald-350 bg-emerald-500/10 dark:bg-emerald-500/20';
+                if (pct < 70) {
+                  colorClass = 'text-rose-700 dark:text-rose-350 bg-rose-500/20 dark:bg-rose-500/30';
+                } else if (pct < 80) {
+                  colorClass = 'text-orange-700 dark:text-orange-350 bg-orange-500/15 dark:bg-orange-500/25';
+                }
+                
+                return (
+                  <td
+                    key={d}
+                    className={`p-0.5 text-center text-[9px] font-black ${colorClass} ${
+                      isSun 
+                        ? 'border-r-2 border-slate-300 dark:border-slate-700' 
+                        : isSat
+                          ? 'border-r border-slate-200 dark:border-slate-800'
+                          : 'border-r border-slate-200 dark:border-slate-800'
+                    }`}
+                  >
+                    {pct}%
+                  </td>
+                );
+              })}
+              {/* Summary Cell */}
+              <td className="p-0.5 text-center text-[9px] font-bold bg-slate-50/40 dark:bg-slate-900/20 border-l border-b border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300">
+                <div className="flex flex-col items-center">
+                  {(() => {
+                    const avgPct = Math.round(
+                      Array.from({ length: diasCount }).reduce((acc: number, _, d) => {
+                        const activeCount = colaboradores.filter(c => c.escala[d] === 'WORK').length;
+                        const pct = colaboradores.length > 0 ? (activeCount / colaboradores.length) * 100 : 0;
+                        return acc + pct;
+                      }, 0) / diasCount
+                    );
+                    return (
+                      <>
+                        <span className="font-extrabold text-[9px] text-slate-800 dark:text-slate-200">{avgPct}%</span>
+                        <span className="text-[6.5px] text-slate-450 font-normal">Média</span>
+                      </>
+                    );
+                  })()}
+                </div>
+              </td>
+            </tr>
+
             {/* T1 Summary Group */}
             {selectedShifts.includes('T1') && (
               <>
                 {/* Visual Shift Header */}
-                <tr className="bg-slate-50 dark:bg-slate-950 text-[9px] font-extrabold border-t-2 border-slate-200 dark:border-slate-800">
-                  <td colSpan={diasCount + 2} className="p-1 px-3 text-white  bg-emerald-600 dark:bg-emerald-700 border-l-4 border-slate-800 shadow-sm">
-                    <span className="sticky left-3 z-10 inline-block"><span className="sticky left-3 z-10 inline-block">PAINEL DE TOTAIS: 1º TURNO (T1)</span></span>
+                <tr 
+                  onClick={() => toggleSummaryPanel('T1')}
+                  className="bg-slate-50 dark:bg-slate-950 text-[9px] font-extrabold border-t-2 border-slate-200 dark:border-slate-800 cursor-pointer select-none"
+                >
+                  <td colSpan={diasCount + 2} className="p-1.5 px-3 text-white bg-emerald-600 dark:bg-emerald-700 border-l-4 border-slate-800 shadow-sm">
+                    <span className="sticky left-3 z-10 flex items-center gap-1.5">
+                      {collapsedSummaryPanels.includes('T1') ? (
+                        <ChevronRight className="w-3.5 h-3.5 text-white" />
+                      ) : (
+                        <ChevronDown className="w-3.5 h-3.5 text-white" />
+                      )}
+                      <span>PAINEL DE TOTAIS: 1º TURNO (T1)</span>
+                    </span>
                   </td>
                 </tr>
+                {!collapsedSummaryPanels.includes('T1') && (
+                <>
                 <tr className="hover:bg-slate-50/50 transition">
                   <td className="p-1 sticky left-0 z-20 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 font-bold text-[9px] shadow-sm text-slate-700 dark:text-slate-300">
                     Ativos T1
@@ -912,6 +995,8 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
                     </div>
                   </td>
                 </tr>
+                </>
+                )}
               </>
             )}
 
@@ -919,11 +1004,23 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
             {selectedShifts.includes('T2') && (
               <>
                 {/* Visual Shift Header */}
-                <tr className="bg-slate-50 dark:bg-slate-950 text-[9px] font-extrabold border-t-2 border-slate-200 dark:border-slate-800">
-                  <td colSpan={diasCount + 2} className="p-1 px-3 text-white  bg-amber-600 dark:bg-amber-700 border-l-4 border-slate-800 shadow-sm">
-                    <span className="sticky left-3 z-10 inline-block"><span className="sticky left-3 z-10 inline-block">PAINEL DE TOTAIS: 2º TURNO (T2)</span></span>
+                <tr 
+                  onClick={() => toggleSummaryPanel('T2')}
+                  className="bg-slate-50 dark:bg-slate-950 text-[9px] font-extrabold border-t-2 border-slate-200 dark:border-slate-800 cursor-pointer select-none"
+                >
+                  <td colSpan={diasCount + 2} className="p-1.5 px-3 text-white bg-amber-600 dark:bg-amber-700 border-l-4 border-slate-800 shadow-sm">
+                    <span className="sticky left-3 z-10 flex items-center gap-1.5">
+                      {collapsedSummaryPanels.includes('T2') ? (
+                        <ChevronRight className="w-3.5 h-3.5 text-white" />
+                      ) : (
+                        <ChevronDown className="w-3.5 h-3.5 text-white" />
+                      )}
+                      <span>PAINEL DE TOTAIS: 2º TURNO (T2)</span>
+                    </span>
                   </td>
                 </tr>
+                {!collapsedSummaryPanels.includes('T2') && (
+                <>
                 <tr className="hover:bg-slate-50/50 transition">
                   <td className="p-1 sticky left-0 z-20 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 font-bold text-[9px] shadow-sm text-slate-700 dark:text-slate-300">
                     Ativos T2
@@ -1121,6 +1218,8 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
                     </div>
                   </td>
                 </tr>
+                </>
+                )}
               </>
             )}
 
@@ -1128,11 +1227,23 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
             {selectedShifts.includes('T3') && (
               <>
                 {/* Visual Shift Header */}
-                <tr className="bg-slate-50 dark:bg-slate-950 text-[9px] font-extrabold border-t-2 border-slate-200 dark:border-slate-800">
-                  <td colSpan={diasCount + 2} className="p-1 px-3 text-white  bg-indigo-600 dark:bg-indigo-700 border-l-4 border-slate-800 shadow-sm animate-none">
-                    <span className="sticky left-3 z-10 inline-block"><span className="sticky left-3 z-10 inline-block">PAINEL DE TOTAIS: 3º TURNO (T3)</span></span>
+                <tr 
+                  onClick={() => toggleSummaryPanel('T3')}
+                  className="bg-slate-50 dark:bg-slate-950 text-[9px] font-extrabold border-t-2 border-slate-200 dark:border-slate-800 cursor-pointer select-none"
+                >
+                  <td colSpan={diasCount + 2} className="p-1.5 px-3 text-white bg-indigo-600 dark:bg-indigo-700 border-l-4 border-slate-800 shadow-sm animate-none">
+                    <span className="sticky left-3 z-10 flex items-center gap-1.5">
+                      {collapsedSummaryPanels.includes('T3') ? (
+                        <ChevronRight className="w-3.5 h-3.5 text-white" />
+                      ) : (
+                        <ChevronDown className="w-3.5 h-3.5 text-white" />
+                      )}
+                      <span>PAINEL DE TOTAIS: 3º TURNO (T3)</span>
+                    </span>
                   </td>
                 </tr>
+                {!collapsedSummaryPanels.includes('T3') && (
+                <>
                 <tr className="hover:bg-slate-50/50 transition">
                   <td className="p-1 sticky left-0 z-20 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 font-bold text-[9px] shadow-sm text-slate-700 dark:text-slate-300">
                     Ativos T3
@@ -1330,6 +1441,8 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
                     </div>
                   </td>
                 </tr>
+                </>
+                )}
               </>
             )}
 
@@ -1337,11 +1450,23 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
             {selectedShifts.length > 1 && (
               <>
                 {/* Visual Shift Header */}
-                <tr className="bg-slate-50 dark:bg-slate-950 text-[9px] font-extrabold border-t-2 border-slate-200 dark:border-slate-800">
-                  <td colSpan={diasCount + 2} className="p-1 px-3 text-white  bg-slate-700 dark:bg-slate-800 border-l-4 border-slate-800 shadow-sm animate-none">
-                    <span className="sticky left-3 z-10 inline-block"><span className="sticky left-3 z-10 inline-block">CONSOLIDADO GERAL (TODOS OS TURNOS)</span></span>
+                <tr 
+                  onClick={() => toggleSummaryPanel('CONSOLIDADO')}
+                  className="bg-slate-50 dark:bg-slate-955 text-[9px] font-extrabold border-t-2 border-slate-200 dark:border-slate-800 cursor-pointer select-none"
+                >
+                  <td colSpan={diasCount + 2} className="p-1.5 px-3 text-white bg-slate-700 dark:bg-slate-800 border-l-4 border-slate-800 shadow-sm animate-none">
+                    <span className="sticky left-3 z-10 flex items-center gap-1.5">
+                      {collapsedSummaryPanels.includes('CONSOLIDADO') ? (
+                        <ChevronRight className="w-3.5 h-3.5 text-white" />
+                      ) : (
+                        <ChevronDown className="w-3.5 h-3.5 text-white" />
+                      )}
+                      <span>CONSOLIDADO GERAL (TODOS OS TURNOS)</span>
+                    </span>
                   </td>
                 </tr>
+                {!collapsedSummaryPanels.includes('CONSOLIDADO') && (
+                <>
                 <tr className="hover:bg-slate-50/50 transition">
                   <td className="p-1 sticky left-0 z-20 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 font-bold text-[9px] shadow-sm text-slate-700 dark:text-slate-300">
                     Ativos Geral
@@ -1531,6 +1656,8 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
                     </div>
                   </td>
                 </tr>
+                </>
+                )}
               </>
             )}
           </tbody>

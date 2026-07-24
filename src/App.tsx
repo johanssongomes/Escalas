@@ -309,8 +309,15 @@ function App() {
 
 
 
-  const dailyCoverage = calculateDailyCoverage(colaboradores, params.dias);
-  const weeklyCoverage = calculateWeeklyCoverage(dailyCoverage);
+  const startDay = (params.month !== undefined && params.year !== undefined)
+    ? (new Date(params.year, params.month, 1).getDay() + 6) % 7
+    : 0;
+  const diasNum = (params.month !== undefined && params.year !== undefined)
+    ? new Date(params.year, params.month + 1, 0).getDate()
+    : params.dias;
+
+  const dailyCoverage = calculateDailyCoverage(colaboradores, diasNum);
+  const weeklyCoverage = calculateWeeklyCoverage(dailyCoverage, startDay);
   const indicators = calculateIndicators(colaboradores, dailyCoverage);
 
   return (
