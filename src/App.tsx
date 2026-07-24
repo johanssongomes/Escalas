@@ -121,14 +121,16 @@ function App() {
 
   // Load from Supabase on init
   useEffect(() => {
-    if (!supabase) {
+    const client = supabase;
+    if (!client) {
       console.warn("Supabase não configurado. Rodando em modo local.");
       setDbLoading(false);
       return;
     }
+    const activeClient = client;
     async function loadData() {
       try {
-        const { data, error } = await supabase.from('escala_config').select('*').eq('id', 1).single();
+        const { data, error } = await activeClient.from('escala_config').select('*').eq('id', 1).single();
         if (error) {
           console.error("Erro ao carregar dados do Supabase:", error);
         } else if (data) {
@@ -173,14 +175,15 @@ function App() {
 
   // Debounced Auto-save to Supabase
   useEffect(() => {
-    if (!isInitialLoadDone || !supabase) return;
+    const client = supabase;
+    if (!isInitialLoadDone || !client) return;
 
     setSyncStatus('pending');
 
     const delayDebounce = setTimeout(async () => {
       setSyncStatus('saving');
       try {
-        const { error } = await supabase
+        const { error } = await client
           .from('escala_config')
           .upsert({
             id: 1,
@@ -208,9 +211,10 @@ function App() {
 
   // Real-time listener for changes from other users
   useEffect(() => {
-    if (!isInitialLoadDone || !supabase) return;
+    const client = supabase;
+    if (!isInitialLoadDone || !client) return;
 
-    const channel = supabase
+    const channel = client
       .channel('escala_realtime')
       .on(
         'postgres_changes',
@@ -251,7 +255,7 @@ function App() {
       .subscribe();
 
     return () => {
-      supabase.removeChannel(channel);
+      client.removeChannel(channel);
     };
   }, [isInitialLoadDone]);
 
