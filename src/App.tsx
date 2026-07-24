@@ -341,6 +341,41 @@ function App() {
     return result;
   };
 
+  const saveToDatabase = async (
+    colabs: Colaborador[],
+    tms: TeamConfig[],
+    pms: ScheduleParams,
+    demM3: typeof demandaDiariaM3,
+    demPcs: typeof demandaDiariaPcs
+  ) => {
+    const client = supabase;
+    if (!client) return;
+    setSyncStatus('saving');
+    try {
+      const { error } = await client
+        .from('escala_config')
+        .upsert({
+          id: 1,
+          colaboradores: colabs,
+          teams: tms,
+          params: pms,
+          demanda_m3: demM3,
+          demanda_pcs: demPcs,
+          updated_at: new Date().toISOString(),
+        });
+      if (error) {
+        console.error("Erro ao salvar no banco:", error);
+        setSyncStatus('error');
+      } else {
+        setSyncStatus('synced');
+        setIsDirty(false);
+      }
+    } catch (err) {
+      console.error("Erro ao salvar no banco:", err);
+      setSyncStatus('error');
+    }
+  };
+
   const handleUpdateTeams = (newTeams: TeamConfig[]) => {
     setTeams(newTeams);
     const startDay = (params.month !== undefined && params.year !== undefined)
@@ -352,7 +387,8 @@ function App() {
     const updated = applyTeamsToColaboradores(colaboradores, newTeams, startDay, dias);
     setColaboradores(updated);
     setIsManualMode(true);
-    setIsDirty(true);
+    setIsDirty(false);
+    saveToDatabase(updated, newTeams, params, demandaDiariaM3, demandaDiariaPcs);
   };
 
   const [isManualMode, setIsManualMode] = useState<boolean>(() => {
@@ -559,6 +595,18 @@ function App() {
                 {syncStatus === 'error' && <span className="text-rose-400">● Erro ao salvar</span>}
               </span>
             </div>
+
+            {/* Manual Save Button */}
+            <button
+              onClick={() => {
+                setIsDirty(false);
+                saveToDatabase(colaboradores, teams, params, demandaDiariaM3, demandaDiariaPcs);
+              }}
+              className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-black bg-emerald-600 hover:bg-emerald-750 text-white transition cursor-pointer shadow-md hover:shadow-lg"
+              title="Salvar dados na nuvem imediatamente"
+            >
+              Salvar na Nuvem
+            </button>
 
             <button
               onClick={toggleDarkMode}
