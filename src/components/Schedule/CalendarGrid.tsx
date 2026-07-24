@@ -864,7 +864,10 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
                     );
                   })()}
                 </div>
-              {/* Shift Summary Groups */}
+              </td>
+            </tr>
+
+            {/* Shift Summary Groups */}
             {['T3', 'T1', 'T2'].map((shift) => {
               if (!selectedShifts.includes(shift)) return null;
 
@@ -1097,9 +1100,7 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
                   )}
                 </React.Fragment>
               );
-            })}            )}
-              </>
-            )}
+            })}
 
             {/* Total Geral Summary Group */}
             {selectedShifts.length > 1 && (
