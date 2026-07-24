@@ -15,8 +15,13 @@ import { Charts } from './components/Dashboard/Charts';
 import { ShiftTimeline } from './components/Dashboard/ShiftTimeline';
 import { calculateDailyCoverage, calculateWeeklyCoverage } from './utils/coverageEngine';
 import { calculateIndicators } from './utils/dashboardEngine';
+import { supabase } from './utils/supabaseClient';
 
 function App() {
+  const [dbLoading, setDbLoading] = useState<boolean>(true);
+  const [syncStatus, setSyncStatus] = useState<'synced' | 'pending' | 'saving' | 'error'>('synced');
+  const [isInitialLoadDone, setIsInitialLoadDone] = useState<boolean>(false);
+
   const [darkMode, setDarkMode] = useState<boolean>(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('darkMode');
@@ -93,6 +98,107 @@ function App() {
       localStorage.setItem('escala_colaboradores_auto', JSON.stringify(colaboradores));
     }
   }, [colaboradores]);
+
+  const [demandaDiariaM3, setDemandaDiariaM3] = useState<{ [key: string]: number[] }>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('demandaDiaria_m3') || localStorage.getItem('demandaDiaria');
+      if (saved) {
+        try { return JSON.parse(saved); } catch {}
+      }
+    }
+    return { T1: Array(28).fill(0), T2: Array(28).fill(0), T3: Array(28).fill(0) };
+  });
+
+  const [demandaDiariaPcs, setDemandaDiariaPcs] = useState<{ [key: string]: number[] }>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('demandaDiaria_pcs');
+      if (saved) {
+        try { return JSON.parse(saved); } catch {}
+      }
+    }
+    return { T1: Array(28).fill(0), T2: Array(28).fill(0), T3: Array(28).fill(0) };
+  });
+
+  // Load from Supabase on init
+  useEffect(() => {
+    async function loadData() {
+      try {
+        const { data, error } = await supabase.from('escala_config').select('*').eq('id', 1).single();
+        if (error) {
+          console.error("Erro ao carregar dados do Supabase:", error);
+        } else if (data) {
+          if (data.colaboradores && Array.isArray(data.colaboradores) && data.colaboradores.length > 0) {
+            setColaboradores(data.colaboradores);
+            localStorage.setItem('escala_colaboradores_auto', JSON.stringify(data.colaboradores));
+            setIsManualMode(true);
+          }
+          if (data.teams && Array.isArray(data.teams)) {
+            setTeams(data.teams);
+            localStorage.setItem('escala_teams_config', JSON.stringify(data.teams));
+          }
+          if (data.params && typeof data.params === 'object' && Object.keys(data.params).length > 0) {
+            setParams(data.params);
+            localStorage.setItem('scheduleParams', JSON.stringify(data.params));
+          }
+          if (data.demanda_m3) {
+            setDemandaDiariaM3(data.demanda_m3);
+            localStorage.setItem('demandaDiaria_m3', JSON.stringify(data.demanda_m3));
+          }
+          if (data.demanda_pcs) {
+            setDemandaDiariaPcs(data.demanda_pcs);
+            localStorage.setItem('demandaDiaria_pcs', JSON.stringify(data.demanda_pcs));
+          }
+        }
+      } catch (err) {
+        console.error("Falha de conexão com o banco de dados:", err);
+      } finally {
+        setDbLoading(false);
+      }
+    }
+    loadData();
+  }, []);
+
+  // Track isInitialLoadDone
+  useEffect(() => {
+    if (!dbLoading) {
+      // Small timeout to prevent immediate pending state on load
+      const t = setTimeout(() => setIsInitialLoadDone(true), 800);
+      return () => clearTimeout(t);
+    }
+  }, [dbLoading]);
+
+  // Track changes to mark sync pending
+  useEffect(() => {
+    if (isInitialLoadDone) {
+      setSyncStatus('pending');
+    }
+  }, [colaboradores, teams, params, demandaDiariaM3, demandaDiariaPcs, isInitialLoadDone]);
+
+  const handleSaveToCloud = async () => {
+    setSyncStatus('saving');
+    try {
+      const { error } = await supabase
+        .from('escala_config')
+        .upsert({
+          id: 1,
+          colaboradores,
+          teams,
+          params,
+          demanda_m3: demandaDiariaM3,
+          demanda_pcs: demandaDiariaPcs,
+          updated_at: new Date().toISOString(),
+        });
+      if (error) {
+        console.error("Erro ao salvar no banco:", error);
+        setSyncStatus('error');
+      } else {
+        setSyncStatus('synced');
+      }
+    } catch (err) {
+      console.error("Erro ao salvar no banco:", err);
+      setSyncStatus('error');
+    }
+  };
 
   // Distribute collaborators to teams based on the configured memberCount
   const applyTeamsToColaboradores = (colabs: Colaborador[], newTeams: TeamConfig[], startDay: number, dias: number): Colaborador[] => {
@@ -318,6 +424,20 @@ function App() {
     ? new Date(params.year, params.month + 1, 0).getDate()
     : params.dias;
 
+  if (dbLoading) {
+    return (
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col items-center justify-center text-slate-800 dark:text-slate-100 transition-colors duration-200">
+        <div className="flex flex-col items-center gap-4">
+          <Truck className="w-12 h-12 text-blue-600 animate-bounce" />
+          <p className="font-bold text-sm tracking-wide">Carregando dados da nuvem (Supabase)...</p>
+          <div className="w-48 bg-slate-200 dark:bg-slate-850 h-1.5 rounded-full overflow-hidden">
+            <div className="bg-blue-600 h-full w-2/3 animate-pulse rounded-full"></div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const dailyCoverage = calculateDailyCoverage(colaboradores, diasNum);
   const weeklyCoverage = calculateWeeklyCoverage(dailyCoverage, startDay);
   const indicators = calculateIndicators(colaboradores, dailyCoverage);
@@ -346,7 +466,24 @@ function App() {
             </div>
           </div>
 
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-4 flex-wrap">
+            {/* Cloud Sync Controller */}
+            <div className="flex items-center gap-2 bg-white/10 border border-white/20 p-1.5 px-3 rounded-xl backdrop-blur-md text-xs">
+              <span className="font-bold uppercase tracking-wider text-[9px] min-w-[110px]">
+                {syncStatus === 'synced' && <span className="text-emerald-400">● Nuvem Sincronizada</span>}
+                {syncStatus === 'pending' && <span className="text-amber-400">● Pendente de Salvar</span>}
+                {syncStatus === 'saving' && <span className="text-blue-300 animate-pulse">● Salvando...</span>}
+                {syncStatus === 'error' && <span className="text-rose-400">● Erro ao salvar</span>}
+              </span>
+              <button
+                disabled={syncStatus === 'saving' || dbLoading}
+                onClick={handleSaveToCloud}
+                className="p-1 px-3 rounded-lg bg-orange-500 hover:bg-orange-600 text-white font-black text-[10px] transition cursor-pointer disabled:opacity-50 uppercase shadow"
+              >
+                Salvar
+              </button>
+            </div>
+
             <button
               onClick={toggleDarkMode}
               className="p-2.5 rounded-xl bg-white/10 hover:bg-white/20 transition backdrop-blur-md border border-white/20 cursor-pointer"
@@ -540,6 +677,10 @@ function App() {
                 params={params}
                 teams={teams}
                 onUpdateTeams={handleUpdateTeams}
+                demandaDiariaM3Prop={demandaDiariaM3}
+                demandaDiariaPcsProp={demandaDiariaPcs}
+                onDemandaChangeM3={setDemandaDiariaM3}
+                onDemandaChangePcs={setDemandaDiariaPcs}
               />
             </section>
           </>

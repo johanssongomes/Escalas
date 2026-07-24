@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import type { Colaborador, ScheduleParams, TeamConfig } from '../../types';
 import { Calendar, User, Filter, Layers, ChevronDown, ChevronRight, ChevronsUpDown, Settings2, Calculator, CheckCircle2, TrendingDown } from 'lucide-react';
 import { TeamManagerModal } from './TeamManagerModal';
@@ -15,6 +15,10 @@ interface CalendarGridProps {
   params?: ScheduleParams;
   teams?: TeamConfig[];
   onUpdateTeams?: (teams: TeamConfig[]) => void;
+  demandaDiariaM3Prop?: { [key: string]: number[] };
+  demandaDiariaPcsProp?: { [key: string]: number[] };
+  onDemandaChangeM3?: (val: { [key: string]: number[] }) => void;
+  onDemandaChangePcs?: (val: { [key: string]: number[] }) => void;
 }
 
 const WEEKDAYS = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'];
@@ -53,6 +57,10 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
   params,
   teams = [],
   onUpdateTeams,
+  demandaDiariaM3Prop,
+  demandaDiariaPcsProp,
+  onDemandaChangeM3,
+  onDemandaChangePcs,
 }) => {
   const startDayOfWeek = (month !== undefined && year !== undefined)
     ? (new Date(year, month, 1).getDay() + 6) % 7
@@ -123,6 +131,18 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
     };
   });
 
+  useEffect(() => {
+    if (demandaDiariaM3Prop) {
+      setDemandaDiariaM3(demandaDiariaM3Prop);
+    }
+  }, [demandaDiariaM3Prop]);
+
+  useEffect(() => {
+    if (demandaDiariaPcsProp) {
+      setDemandaDiariaPcs(demandaDiariaPcsProp);
+    }
+  }, [demandaDiariaPcsProp]);
+
   const demandaDiaria = prodUnit === 'm3' ? demandaDiariaM3 : demandaDiariaPcs;
 
   const capacityStats = useMemo(() => {
@@ -180,12 +200,14 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
       newDemanda[shift][dayIdx] = val;
       setDemandaDiariaM3(newDemanda);
       localStorage.setItem('demandaDiaria_m3', JSON.stringify(newDemanda));
+      if (onDemandaChangeM3) onDemandaChangeM3(newDemanda);
     } else {
       const newDemanda = { ...demandaDiariaPcs };
       if (!newDemanda[shift]) newDemanda[shift] = Array(diasCount).fill(0);
       newDemanda[shift][dayIdx] = val;
       setDemandaDiariaPcs(newDemanda);
       localStorage.setItem('demandaDiaria_pcs', JSON.stringify(newDemanda));
+      if (onDemandaChangePcs) onDemandaChangePcs(newDemanda);
     }
   };
 
