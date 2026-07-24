@@ -15,6 +15,7 @@ import { Calculator, TrendingUp, CheckCircle2, TrendingDown } from 'lucide-react
 interface ProductivitySimulatorProps {
   colaboradores: Colaborador[];
   params: ScheduleParams;
+  diasCount?: number;
 }
 
 const WEEKDAYS = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'];
@@ -22,10 +23,11 @@ const WEEKDAYS = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'];
 export const ProductivitySimulator: React.FC<ProductivitySimulatorProps> = ({
   colaboradores,
   params,
+  diasCount: diasCountProp,
 }) => {
   const [prodRate, setProdRate] = useState<number>(25);
 
-  const diasCount = params.dias;
+  const diasCount = diasCountProp ?? params.dias;
 
   // Calculate daily active headcount per shift
   const dailyStats = useMemo(() => {

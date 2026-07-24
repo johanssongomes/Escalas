@@ -860,7 +860,7 @@ function App() {
               {/* Part 2: Interactive Grid */}
               <CalendarGrid 
                 colaboradores={colaboradores} 
-                diasCount={params.dias} 
+                diasCount={diasNum} 
                 month={params.month} 
                 year={params.year} 
                 plain={true} 
