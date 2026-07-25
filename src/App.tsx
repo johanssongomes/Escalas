@@ -480,6 +480,13 @@ function App() {
 
   const handleUpdateTeams = (newTeams: TeamConfig[]) => {
     setTeams(newTeams);
+    if (newTeams.length === 0) {
+      setColaboradores([]);
+      setIsManualMode(false);
+      setIsDirty(false);
+      saveToDatabase([], newTeams, params, demandaDiariaM3, demandaDiariaPcs);
+      return;
+    }
     const startDay = (params.month !== undefined && params.year !== undefined)
       ? (new Date(params.year, params.month, 1).getDay() + 6) % 7
       : 0;
