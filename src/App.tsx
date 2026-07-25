@@ -314,6 +314,11 @@ function App() {
     if (!dbLoading) {
       const t = setTimeout(() => {
         setIsInitialLoadDone(true);
+        // Startup check: if no teams exist, clear stale colaboradores from localStorage
+        if (teams.length === 0 && colaboradores.length > 0) {
+          setColaboradores([]);
+          localStorage.setItem('escala_colaboradores_auto', JSON.stringify([]));
+        }
       }, 800);
       return () => clearTimeout(t);
     }
