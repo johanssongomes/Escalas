@@ -143,13 +143,16 @@ function App() {
       if (targetColabs) {
         setColaboradores(targetColabs);
         setIsManualMode(true);
-      } else {
+      } else if (teams.length > 0) {
         const scale = generateSchedule({ ...resolved, dias: targetDias }).map(c => ({
           ...c,
           team: undefined,
           escala: Array(targetDias).fill('WORK' as DayStatus),
         }));
         setColaboradores(scale);
+        setIsManualMode(false);
+      } else {
+        setColaboradores([]);
         setIsManualMode(false);
       }
 
@@ -567,10 +570,22 @@ function App() {
 
   const handleUpdateTeams = (newTeams: TeamConfig[]) => {
     setTeams(newTeams);
+
+    const currentKey = `${params.month}_${params.year}`;
+    const shiftsWithTeams = newTeams.length > 0 ? new Set(newTeams.map(t => t.shiftType)) as Set<ShiftType> : new Set<ShiftType>();
+    const updatedMesesData = { ...((params as any).meses_data ?? {}) } as Record<string, Colaborador[]>;
+
     if (newTeams.length === 0) {
       setColaboradores([]);
       setIsManualMode(true);
       setIsDirty(false);
+      // Clear current month from meses_data
+      delete updatedMesesData[currentKey];
+      // Clear all other months
+      for (const key of Object.keys(updatedMesesData)) {
+        updatedMesesData[key] = [];
+      }
+      setParams(prev => ({ ...prev, meses_data: updatedMesesData }));
       saveToDatabase([], newTeams, params, demandaDiariaM3, demandaDiariaPcs);
     } else {
       const startDay = (params.month !== undefined && params.year !== undefined)
@@ -580,9 +595,7 @@ function App() {
         ? new Date(params.year, params.month + 1, 0).getDate()
         : params.dias;
 
-      const shiftsWithTeams = new Set(newTeams.map(t => t.shiftType));
       let colabs = [...colaboradores];
-
       colabs = colabs.filter(c => shiftsWithTeams.has(c.turno));
 
       for (const shift of shiftsWithTeams) {
@@ -608,52 +621,49 @@ function App() {
       setColaboradores(kept);
       setIsManualMode(true);
       setIsDirty(false);
-      saveToDatabase(kept, newTeams, params, demandaDiariaM3, demandaDiariaPcs);
-    }
 
-    // Propagate team changes to ALL saved months in localStorage
-    const currentKey = `escala_saved_${params.month}_${params.year}`;
-    const shiftsWithTeams = newTeams.length > 0 ? new Set(newTeams.map(t => t.shiftType)) as Set<ShiftType> : new Set<ShiftType>();
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (!key || !key.startsWith('escala_saved_') || key === currentKey) continue;
+      // Persist current month into meses_data
+      if (kept.length > 0) {
+        updatedMesesData[currentKey] = kept;
+      } else {
+        delete updatedMesesData[currentKey];
+      }
 
-      const saved = localStorage.getItem(key);
-      if (!saved) continue;
-      try {
+      // Re-apply teams to each other saved month
+      for (const [key, monthColabs] of Object.entries(updatedMesesData)) {
+        if (key === currentKey) continue;
         const parts = key.split('_');
-        const m = parseInt(parts[2]);
-        const y = parseInt(parts[3]);
+        const m = parseInt(parts[0]);
+        const y = parseInt(parts[1]);
         if (isNaN(m) || isNaN(y)) continue;
 
-        if (newTeams.length === 0) {
-          localStorage.setItem(key, JSON.stringify([]));
-        } else {
-          const savedStartDay = (new Date(y, m, 1).getDay() + 6) % 7;
-          const savedDias = new Date(y, m + 1, 0).getDate();
-          let monthColabs = (JSON.parse(saved) as Colaborador[]).filter(c => shiftsWithTeams.has(c.turno));
+        const savedStartDay = (new Date(y, m, 1).getDay() + 6) % 7;
+        const savedDias = new Date(y, m + 1, 0).getDate();
+        let monthData = monthColabs.filter(c => shiftsWithTeams.has(c.turno));
 
-          for (const shift of shiftsWithTeams) {
-            const shiftTeams = newTeams.filter(t => t.shiftType === shift);
-            const totalNeeded = shiftTeams.reduce((sum, t) => sum + t.memberCount, 0);
-            const existing = monthColabs.filter(c => c.turno === shift).length;
-            const missing = totalNeeded - existing;
+        for (const shift of shiftsWithTeams) {
+          const shiftTeams = newTeams.filter(t => t.shiftType === shift);
+          const totalNeeded = shiftTeams.reduce((sum, t) => sum + t.memberCount, 0);
+          const existing = monthData.filter(c => c.turno === shift).length;
+          const missing = totalNeeded - existing;
 
-            if (missing > 0) {
-              for (let j = 0; j < missing; j++) {
-                monthColabs.push({
-                  id: `${shift}-${String(existing + j + 1).padStart(3, '0')}`,
-                  turno: shift,
-                  escala: Array(savedDias).fill('WORK' as DayStatus),
-                });
-              }
+          if (missing > 0) {
+            for (let j = 0; j < missing; j++) {
+              monthData.push({
+                id: `${shift}-${String(existing + j + 1).padStart(3, '0')}`,
+                turno: shift,
+                escala: Array(savedDias).fill('WORK' as DayStatus),
+              });
             }
           }
-
-          const updated = applyTeamsToColaboradores(monthColabs, newTeams, savedStartDay, savedDias);
-          localStorage.setItem(key, JSON.stringify(updated.filter(c => c.team !== undefined)));
         }
-      } catch {}
+
+        const reapplied = applyTeamsToColaboradores(monthData, newTeams, savedStartDay, savedDias);
+        updatedMesesData[key] = reapplied.filter(c => c.team !== undefined);
+      }
+
+      setParams(prev => ({ ...prev, meses_data: updatedMesesData }));
+      saveToDatabase(kept, newTeams, params, demandaDiariaM3, demandaDiariaPcs);
     }
   };
 
@@ -682,6 +692,11 @@ function App() {
 
   // Generate empty schedule (all WORK — no off days until teams are applied)
   const handleRecalculate = () => {
+    if (teams.length === 0) {
+      setColaboradores([]);
+      setIsDirty(true);
+      return;
+    }
     const scale = generateSchedule(params).map(c => ({
       ...c,
       team: undefined,
