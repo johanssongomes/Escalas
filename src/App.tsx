@@ -482,7 +482,7 @@ function App() {
     setTeams(newTeams);
     if (newTeams.length === 0) {
       setColaboradores([]);
-      setIsManualMode(false);
+      setIsManualMode(true);
       setIsDirty(false);
       saveToDatabase([], newTeams, params, demandaDiariaM3, demandaDiariaPcs);
       return;
@@ -493,11 +493,40 @@ function App() {
     const dias = (params.month !== undefined && params.year !== undefined)
       ? new Date(params.year, params.month + 1, 0).getDate()
       : params.dias;
-    const updated = applyTeamsToColaboradores(colaboradores, newTeams, startDay, dias);
-    setColaboradores(updated);
+
+    const shiftsWithTeams = new Set(newTeams.map(t => t.shiftType));
+    let colabs = [...colaboradores];
+
+    // Remove collaborators from shifts that have no teams
+    colabs = colabs.filter(c => shiftsWithTeams.has(c.turno));
+
+    // For each shift with teams, ensure enough collaborators exist
+    for (const shift of shiftsWithTeams) {
+      const shiftTeams = newTeams.filter(t => t.shiftType === shift);
+      const totalNeeded = shiftTeams.reduce((sum, t) => sum + t.memberCount, 0);
+      const existing = colabs.filter(c => c.turno === shift).length;
+      const missing = totalNeeded - existing;
+
+      if (missing > 0) {
+        for (let i = 0; i < missing; i++) {
+          const nextNum = existing + i + 1;
+          colabs.push({
+            id: `${shift}-${String(nextNum).padStart(3, '0')}`,
+            turno: shift,
+            escala: Array(dias).fill('WORK' as DayStatus),
+          });
+        }
+      }
+    }
+
+    const updated = applyTeamsToColaboradores(colabs, newTeams, startDay, dias);
+
+    // Only keep collaborators that fit into a team (remove waiting area overflow)
+    const kept = updated.filter(c => c.team !== undefined);
+    setColaboradores(kept);
     setIsManualMode(true);
     setIsDirty(false);
-    saveToDatabase(updated, newTeams, params, demandaDiariaM3, demandaDiariaPcs);
+    saveToDatabase(kept, newTeams, params, demandaDiariaM3, demandaDiariaPcs);
   };
 
   const [isManualMode, setIsManualMode] = useState<boolean>(() => {
