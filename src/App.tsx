@@ -303,6 +303,22 @@ function App() {
       } catch (err) {
         console.error("Falha de conexão com o banco de dados:", err);
       } finally {
+        // After DB load, if there are no teams, ensure colaboradores are empty
+        // Use setTimeout to let batched state updates settle before reading latest values
+        setTimeout(() => {
+          setTeams(currentTeams => {
+            if (currentTeams.length === 0) {
+              setColaboradores(currentColabs => {
+                if (currentColabs.length > 0) {
+                  localStorage.setItem('escala_colaboradores_auto', JSON.stringify([]));
+                  return [];
+                }
+                return currentColabs;
+              });
+            }
+            return currentTeams;
+          });
+        }, 0);
         setDbLoading(false);
       }
     }
@@ -338,6 +354,8 @@ function App() {
       const currentKey = `${params.month}_${params.year}`;
       if (colaboradores.length > 0) {
         mesesData[currentKey] = colaboradores;
+      } else {
+        delete mesesData[currentKey];
       }
 
       try {
@@ -546,6 +564,8 @@ function App() {
     const currentKey = `${pms.month}_${pms.year}`;
     if (colabs.length > 0) {
       mesesData[currentKey] = colabs;
+    } else {
+      delete mesesData[currentKey];
     }
 
     try {
