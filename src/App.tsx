@@ -151,13 +151,18 @@ function App() {
         }));
         setColaboradores(scale);
         setIsManualMode(false);
+        // Persist updated meses_data to params — use scale (not stale colaboradores)
+        setParams({ ...resolved, meses_data: { ...mesesData, [targetKey]: scale } });
+        setIsDirty(true);
+        localStorage.setItem(`escala_saved_${currentKey}`, JSON.stringify(mesesData[currentKey] ?? []));
+        return;
       } else {
         setColaboradores([]);
         setIsManualMode(false);
       }
 
-      // Persist updated meses_data to params so auto-save sends it to Supabase
-      setParams({ ...resolved, meses_data: { ...mesesData, [targetKey]: targetColabs ?? colaboradores } });
+      // Persist updated meses_data to params
+      setParams({ ...resolved, meses_data: { ...mesesData, [targetKey]: targetColabs ?? [] } });
       setIsDirty(true);
       // Dev cache: also save to localStorage for offline access
       localStorage.setItem(`escala_saved_${currentKey}`, JSON.stringify(mesesData[currentKey] ?? []));
@@ -349,11 +354,17 @@ function App() {
 
     const delayDebounce = setTimeout(async () => {
       setSyncStatus('saving');
+      // Use refs to read latest state (effect may not re-run when isDirty is already true)
+      const latestParams = paramsRef.current;
+      const latestColabs = colaboradoresRef.current;
+      const latestTeams = teamsRef.current;
+      const latestDemM3 = demandaM3Ref.current;
+      const latestDemPcs = demandaPcsRef.current;
       // Build meses_data from in-memory params.meses_data + current colaboradores
-      const mesesData = { ...((params as any).meses_data ?? {}) } as Record<string, Colaborador[]>;
-      const currentKey = `${params.month}_${params.year}`;
-      if (colaboradores.length > 0) {
-        mesesData[currentKey] = colaboradores;
+      const mesesData = { ...((latestParams as any).meses_data ?? {}) } as Record<string, Colaborador[]>;
+      const currentKey = `${latestParams.month}_${latestParams.year}`;
+      if (latestColabs.length > 0) {
+        mesesData[currentKey] = latestColabs;
       } else {
         delete mesesData[currentKey];
       }
@@ -363,11 +374,11 @@ function App() {
           .from('escala_config')
           .upsert({
             id: 1,
-            colaboradores,
-            teams,
-            params: { ...params, meses_data: mesesData },
-            demanda_m3: demandaDiariaM3,
-            demanda_pcs: demandaDiariaPcs,
+            colaboradores: latestColabs,
+            teams: latestTeams,
+            params: { ...latestParams, meses_data: mesesData },
+            demanda_m3: latestDemM3,
+            demanda_pcs: latestDemPcs,
             updated_at: new Date().toISOString(),
           });
         if (error) {
@@ -388,11 +399,17 @@ function App() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isDirty, isInitialLoadDone]);
 
-  // Refs to avoid tearing down the realtime channel on every state change
+  // Refs to always read latest state inside async callbacks (debounce, realtime)
   const paramsRef = useRef(params);
   paramsRef.current = params;
   const colaboradoresRef = useRef(colaboradores);
   colaboradoresRef.current = colaboradores;
+  const teamsRef = useRef(teams);
+  teamsRef.current = teams;
+  const demandaM3Ref = useRef(demandaDiariaM3);
+  demandaM3Ref.current = demandaDiariaM3;
+  const demandaPcsRef = useRef(demandaDiariaPcs);
+  demandaPcsRef.current = demandaDiariaPcs;
   const isDirtyRef = useRef(isDirty);
   isDirtyRef.current = isDirty;
   const syncStatusRef = useRef(syncStatus);
@@ -611,7 +628,7 @@ function App() {
         updatedMesesData[key] = [];
       }
       setParams(prev => ({ ...prev, meses_data: updatedMesesData }));
-      saveToDatabase([], newTeams, params, demandaDiariaM3, demandaDiariaPcs);
+      saveToDatabase([], newTeams, { ...params, meses_data: updatedMesesData }, demandaDiariaM3, demandaDiariaPcs);
     } else {
       const startDay = (params.month !== undefined && params.year !== undefined)
         ? (new Date(params.year, params.month, 1).getDay() + 6) % 7
@@ -688,7 +705,7 @@ function App() {
       }
 
       setParams(prev => ({ ...prev, meses_data: updatedMesesData }));
-      saveToDatabase(kept, newTeams, params, demandaDiariaM3, demandaDiariaPcs);
+      saveToDatabase(kept, newTeams, { ...params, meses_data: updatedMesesData }, demandaDiariaM3, demandaDiariaPcs);
     }
   };
 
