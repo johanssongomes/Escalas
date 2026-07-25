@@ -122,7 +122,42 @@ function App() {
 
   // State wrappers to automatically set the dirty flag on user edits
   const handleParamsChange = (newParams: ScheduleParams | ((prev: ScheduleParams) => ScheduleParams)) => {
-    setParams(newParams);
+    const resolved = typeof newParams === 'function' ? newParams(params) : newParams;
+
+    // Detect month/year change and persist/load colaboradores in the SAME render
+    if (isInitialLoadDone && resolved.month !== undefined && resolved.month >= 0 &&
+        (resolved.month !== params.month || resolved.year !== params.year)) {
+      // Save current month's colaboradores before leaving it
+      if (colaboradores.length > 0 && params.month !== undefined && params.month >= 0 && params.year !== undefined) {
+        localStorage.setItem(
+          `escala_saved_${params.month}_${params.year}`,
+          JSON.stringify(colaboradores)
+        );
+      }
+      // Compute correct days for the target month (dias in resolved may still be stale)
+      const targetDias = (resolved.year !== undefined)
+        ? new Date(resolved.year, resolved.month + 1, 0).getDate()
+        : resolved.dias ?? 30;
+
+      const savedKey = `escala_saved_${resolved.month}_${resolved.year}`;
+      const saved = localStorage.getItem(savedKey);
+      if (saved) {
+        try {
+          setColaboradores(JSON.parse(saved));
+          setIsManualMode(true);
+        } catch {}
+      } else {
+        const scale = generateSchedule({ ...resolved, dias: targetDias }).map(c => ({
+          ...c,
+          team: undefined,
+          escala: Array(targetDias).fill('WORK' as DayStatus),
+        }));
+        setColaboradores(scale);
+        setIsManualMode(false);
+      }
+    }
+
+    setParams(resolved);
     setIsDirty(true);
   };
 
@@ -231,7 +266,6 @@ function App() {
 
           if (data.params && typeof data.params === 'object' && Object.keys(data.params).length > 0) {
             setParams(data.params);
-            setPrevMonthYear({ month: data.params.month, year: data.params.year });
             localStorage.setItem('scheduleParams', JSON.stringify(data.params));
           }
           if (data.demanda_m3) {
@@ -467,11 +501,6 @@ function App() {
   });
 
 
-  const [prevMonthYear, setPrevMonthYear] = useState<{ month?: number; year?: number }>({
-    month: params.month,
-    year: params.year
-  });
-
   // Toggle Dark Mode
   const toggleDarkMode = () => {
     setDarkMode(!darkMode);
@@ -499,7 +528,6 @@ function App() {
   };
 
   // Run on initial mount or parameters change (only if not in manual mode)
-  // NOTE: month/year changes are handled separately by the month navigation effect below
   useEffect(() => {
     if (isInitialLoadDone && !isManualMode) {
       handleRecalculate();
@@ -585,45 +613,6 @@ function App() {
     setColaboradores(updated);
     // Do NOT mark dirty here — headcount sync is an internal adjustment, not a user edit
   }, [params.conferentesT1, params.conferentesT2, params.conferentesT3]);
-
-  // Save schedule per month/year so changes persist when navigating between months
-  useEffect(() => {
-    if (!isInitialLoadDone) return;
-    if (params.month !== prevMonthYear.month || params.year !== prevMonthYear.year) {
-      // Save current month's data to localStorage
-      if (colaboradores.length > 0 && prevMonthYear.month !== undefined && prevMonthYear.year !== undefined) {
-        localStorage.setItem(
-          `escala_saved_${prevMonthYear.month}_${prevMonthYear.year}`,
-          JSON.stringify(colaboradores)
-        );
-      }
-
-      const savedKey = `escala_saved_${params.month}_${params.year}`;
-      const saved = localStorage.getItem(savedKey);
-      if (saved) {
-        try {
-          // Batch all state updates together to avoid intermediate renders
-          setColaboradores(JSON.parse(saved));
-          setIsManualMode(true);
-          setPrevMonthYear({ month: params.month, year: params.year });
-          return;
-        } catch {}
-      }
-
-      // No saved data — recalculate for new month.
-      // We set isManualMode and colaboradores together in one logical batch,
-      // then update prevMonthYear. Do NOT call setIsManualMode(false) separately
-      // before handleRecalculate, as that triggers the [isManualMode] effect again.
-      const scale = generateSchedule(params).map(c => ({
-        ...c,
-        team: undefined,
-        escala: Array(c.escala.length).fill('WORK' as DayStatus),
-      }));
-      setColaboradores(scale);
-      setIsManualMode(false);
-      setPrevMonthYear({ month: params.month, year: params.year });
-    }
-  }, [params.month, params.year, isInitialLoadDone]);
 
   const startDay = (params.month !== undefined && params.year !== undefined)
     ? (new Date(params.year, params.month, 1).getDay() + 6) % 7
