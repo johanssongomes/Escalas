@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { ParametersForm } from './components/Schedule/ParametersForm';
 import { CalendarGrid } from './components/Schedule/CalendarGrid';
 import { generateSchedule } from './utils/scheduleEngine';
-import type { ScheduleParams, Colaborador, TeamConfig, DayStatus } from './types';
+import type { ScheduleParams, Colaborador, TeamConfig, DayStatus, ShiftType } from './types';
 import { ShieldCheck, Truck, Moon, Sun, Calendar, BarChart3, Upload } from 'lucide-react';
 import { ImportModal } from './components/Schedule/ImportModal';
 
@@ -95,9 +95,7 @@ function App() {
 
   // Auto-save colaboradores whenever they change in manual mode
   useEffect(() => {
-    if (colaboradores.length > 0) {
-      localStorage.setItem('escala_colaboradores_auto', JSON.stringify(colaboradores));
-    }
+    localStorage.setItem('escala_colaboradores_auto', JSON.stringify(colaboradores));
   }, [colaboradores]);
 
   const [demandaDiariaM3, setDemandaDiariaM3] = useState<{ [key: string]: number[] }>(() => {
@@ -200,62 +198,64 @@ function App() {
             localStorage.setItem('escala_teams_config', JSON.stringify(loadedTeams));
           }
 
-          if (data.colaboradores && Array.isArray(data.colaboradores) && data.colaboradores.length > 0) {
+          if (data.colaboradores && Array.isArray(data.colaboradores)) {
             loadedColabs = data.colaboradores;
 
-            // Check if the DB has corrupted data: colabs exist but none have a team assigned
-            const hasTeamData = loadedColabs.some(c => c.team !== undefined && c.team !== null);
-            const hasEscalaData = loadedColabs.some(c => c.escala && c.escala.some(d => d !== 'WORK'));
+            if (loadedColabs.length > 0) {
+              // Check if the DB has corrupted data: colabs exist but none have a team assigned
+              const hasTeamData = loadedColabs.some(c => c.team !== undefined && c.team !== null);
+              const hasEscalaData = loadedColabs.some(c => c.escala && c.escala.some(d => d !== 'WORK'));
 
-            if (!hasTeamData && !hasEscalaData && loadedTeams.length > 0 && data.params) {
-              // Auto-recover: DB has wiped state — re-apply teams now
-              console.warn("DB tem dados zerados — reaplicando equipes automaticamente...");
-              const sDay = (data.params.month !== undefined && data.params.year !== undefined)
-                ? (new Date(data.params.year, data.params.month, 1).getDay() + 6) % 7
-                : 0;
-              const dias = (data.params.month !== undefined && data.params.year !== undefined)
-                ? new Date(data.params.year, data.params.month + 1, 0).getDate()
-                : (data.params.dias ?? 28);
+              if (!hasTeamData && !hasEscalaData && loadedTeams.length > 0 && data.params) {
+                // Auto-recover: DB has wiped state — re-apply teams now
+                console.warn("DB tem dados zerados — reaplicando equipes automaticamente...");
+                const sDay = (data.params.month !== undefined && data.params.year !== undefined)
+                  ? (new Date(data.params.year, data.params.month, 1).getDay() + 6) % 7
+                  : 0;
+                const dias = (data.params.month !== undefined && data.params.year !== undefined)
+                  ? new Date(data.params.year, data.params.month + 1, 0).getDate()
+                  : (data.params.dias ?? 28);
 
-              // We can't call applyTeamsToColaboradores here (it's defined later in the component)
-              // so we inline a minimal version for recovery
-              const recovered = [...loadedColabs];
-              const shifts = ['T1', 'T2', 'T3'] as const;
-              for (const shift of shifts) {
-                const shiftColabs = recovered.filter(c => c.turno === shift);
-                const shiftTeams = loadedTeams.filter(t => t.shiftType === shift);
-                let cursor = 0;
-                for (const team of shiftTeams) {
-                  for (let i = 0; i < team.memberCount && cursor < shiftColabs.length; i++) {
-                    const colab = shiftColabs[cursor];
-                    const pat = team.offPattern;
-                    const escala = Array.from({ length: dias }, (_, d) => {
-                      const dw = (sDay + d) % 7;
-                      if (Array.isArray(pat)) return (dw === pat[0] || dw === pat[1]) ? 'OFF' : 'WORK';
-                      const isOff = pat === 4 ? (dw === 4 || dw === 5) : pat === 5 ? (dw === 5 || dw === 6) : (dw === 6 || dw === 0);
-                      return isOff ? 'OFF' : 'WORK';
-                    }) as DayStatus[];
-                    const idx = recovered.findIndex(c => c.id === colab.id);
-                    if (idx !== -1) recovered[idx] = { ...recovered[idx], team: team.name, escala };
-                    cursor++;
+                // We can't call applyTeamsToColaboradores here (it's defined later in the component)
+                // so we inline a minimal version for recovery
+                const recovered = [...loadedColabs];
+                const shifts = ['T1', 'T2', 'T3'] as const;
+                for (const shift of shifts) {
+                  const shiftColabs = recovered.filter(c => c.turno === shift);
+                  const shiftTeams = loadedTeams.filter(t => t.shiftType === shift);
+                  let cursor = 0;
+                  for (const team of shiftTeams) {
+                    for (let i = 0; i < team.memberCount && cursor < shiftColabs.length; i++) {
+                      const colab = shiftColabs[cursor];
+                      const pat = team.offPattern;
+                      const escala = Array.from({ length: dias }, (_, d) => {
+                        const dw = (sDay + d) % 7;
+                        if (Array.isArray(pat)) return (dw === pat[0] || dw === pat[1]) ? 'OFF' : 'WORK';
+                        const isOff = pat === 4 ? (dw === 4 || dw === 5) : pat === 5 ? (dw === 5 || dw === 6) : (dw === 6 || dw === 0);
+                        return isOff ? 'OFF' : 'WORK';
+                      }) as DayStatus[];
+                      const idx = recovered.findIndex(c => c.id === colab.id);
+                      if (idx !== -1) recovered[idx] = { ...recovered[idx], team: team.name, escala };
+                      cursor++;
+                    }
                   }
                 }
-              }
-              loadedColabs = recovered;
-              // Save the recovered state back to Supabase immediately
-              try {
-                await activeClient.from('escala_config').upsert({
-                  id: 1,
-                  colaboradores: recovered,
-                  teams: loadedTeams,
-                  params: data.params,
-                  demanda_m3: data.demanda_m3,
-                  demanda_pcs: data.demanda_pcs,
-                  updated_at: new Date().toISOString(),
-                });
-                console.log("Estado recuperado e salvo no banco com sucesso.");
-              } catch (saveErr) {
-                console.error("Erro ao salvar estado recuperado:", saveErr);
+                loadedColabs = recovered;
+                // Save the recovered state back to Supabase immediately
+                try {
+                  await activeClient.from('escala_config').upsert({
+                    id: 1,
+                    colaboradores: recovered,
+                    teams: loadedTeams,
+                    params: data.params,
+                    demanda_m3: data.demanda_m3,
+                    demanda_pcs: data.demanda_pcs,
+                    updated_at: new Date().toISOString(),
+                  });
+                  console.log("Estado recuperado e salvo no banco com sucesso.");
+                } catch (saveErr) {
+                  console.error("Erro ao salvar estado recuperado:", saveErr);
+                }
               }
             }
 
@@ -485,48 +485,89 @@ function App() {
       setIsManualMode(true);
       setIsDirty(false);
       saveToDatabase([], newTeams, params, demandaDiariaM3, demandaDiariaPcs);
-      return;
-    }
-    const startDay = (params.month !== undefined && params.year !== undefined)
-      ? (new Date(params.year, params.month, 1).getDay() + 6) % 7
-      : 0;
-    const dias = (params.month !== undefined && params.year !== undefined)
-      ? new Date(params.year, params.month + 1, 0).getDate()
-      : params.dias;
+    } else {
+      const startDay = (params.month !== undefined && params.year !== undefined)
+        ? (new Date(params.year, params.month, 1).getDay() + 6) % 7
+        : 0;
+      const dias = (params.month !== undefined && params.year !== undefined)
+        ? new Date(params.year, params.month + 1, 0).getDate()
+        : params.dias;
 
-    const shiftsWithTeams = new Set(newTeams.map(t => t.shiftType));
-    let colabs = [...colaboradores];
+      const shiftsWithTeams = new Set(newTeams.map(t => t.shiftType));
+      let colabs = [...colaboradores];
 
-    // Remove collaborators from shifts that have no teams
-    colabs = colabs.filter(c => shiftsWithTeams.has(c.turno));
+      colabs = colabs.filter(c => shiftsWithTeams.has(c.turno));
 
-    // For each shift with teams, ensure enough collaborators exist
-    for (const shift of shiftsWithTeams) {
-      const shiftTeams = newTeams.filter(t => t.shiftType === shift);
-      const totalNeeded = shiftTeams.reduce((sum, t) => sum + t.memberCount, 0);
-      const existing = colabs.filter(c => c.turno === shift).length;
-      const missing = totalNeeded - existing;
+      for (const shift of shiftsWithTeams) {
+        const shiftTeams = newTeams.filter(t => t.shiftType === shift);
+        const totalNeeded = shiftTeams.reduce((sum, t) => sum + t.memberCount, 0);
+        const existing = colabs.filter(c => c.turno === shift).length;
+        const missing = totalNeeded - existing;
 
-      if (missing > 0) {
-        for (let i = 0; i < missing; i++) {
-          const nextNum = existing + i + 1;
-          colabs.push({
-            id: `${shift}-${String(nextNum).padStart(3, '0')}`,
-            turno: shift,
-            escala: Array(dias).fill('WORK' as DayStatus),
-          });
+        if (missing > 0) {
+          for (let i = 0; i < missing; i++) {
+            const nextNum = existing + i + 1;
+            colabs.push({
+              id: `${shift}-${String(nextNum).padStart(3, '0')}`,
+              turno: shift,
+              escala: Array(dias).fill('WORK' as DayStatus),
+            });
+          }
         }
       }
+
+      const updated = applyTeamsToColaboradores(colabs, newTeams, startDay, dias);
+      const kept = updated.filter(c => c.team !== undefined);
+      setColaboradores(kept);
+      setIsManualMode(true);
+      setIsDirty(false);
+      saveToDatabase(kept, newTeams, params, demandaDiariaM3, demandaDiariaPcs);
     }
 
-    const updated = applyTeamsToColaboradores(colabs, newTeams, startDay, dias);
+    // Propagate team changes to ALL saved months in localStorage
+    const currentKey = `escala_saved_${params.month}_${params.year}`;
+    const shiftsWithTeams = newTeams.length > 0 ? new Set(newTeams.map(t => t.shiftType)) as Set<ShiftType> : new Set<ShiftType>();
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (!key || !key.startsWith('escala_saved_') || key === currentKey) continue;
 
-    // Only keep collaborators that fit into a team (remove waiting area overflow)
-    const kept = updated.filter(c => c.team !== undefined);
-    setColaboradores(kept);
-    setIsManualMode(true);
-    setIsDirty(false);
-    saveToDatabase(kept, newTeams, params, demandaDiariaM3, demandaDiariaPcs);
+      const saved = localStorage.getItem(key);
+      if (!saved) continue;
+      try {
+        const parts = key.split('_');
+        const m = parseInt(parts[2]);
+        const y = parseInt(parts[3]);
+        if (isNaN(m) || isNaN(y)) continue;
+
+        if (newTeams.length === 0) {
+          localStorage.setItem(key, JSON.stringify([]));
+        } else {
+          const savedStartDay = (new Date(y, m, 1).getDay() + 6) % 7;
+          const savedDias = new Date(y, m + 1, 0).getDate();
+          let monthColabs = (JSON.parse(saved) as Colaborador[]).filter(c => shiftsWithTeams.has(c.turno));
+
+          for (const shift of shiftsWithTeams) {
+            const shiftTeams = newTeams.filter(t => t.shiftType === shift);
+            const totalNeeded = shiftTeams.reduce((sum, t) => sum + t.memberCount, 0);
+            const existing = monthColabs.filter(c => c.turno === shift).length;
+            const missing = totalNeeded - existing;
+
+            if (missing > 0) {
+              for (let j = 0; j < missing; j++) {
+                monthColabs.push({
+                  id: `${shift}-${String(existing + j + 1).padStart(3, '0')}`,
+                  turno: shift,
+                  escala: Array(savedDias).fill('WORK' as DayStatus),
+                });
+              }
+            }
+          }
+
+          const updated = applyTeamsToColaboradores(monthColabs, newTeams, savedStartDay, savedDias);
+          localStorage.setItem(key, JSON.stringify(updated.filter(c => c.team !== undefined)));
+        }
+      } catch {}
+    }
   };
 
   const [isManualMode, setIsManualMode] = useState<boolean>(() => {
