@@ -118,6 +118,62 @@ function App() {
     return { T1: Array(28).fill(0), T2: Array(28).fill(0), T3: Array(28).fill(0) };
   });
 
+  // Distribute collaborators to teams based on the configured memberCount
+  const applyTeamsToColaboradores = (colabs: Colaborador[], newTeams: TeamConfig[], startDay: number, dias: number): Colaborador[] => {
+    const result = [...colabs];
+    const shifts = ['T1', 'T2', 'T3'] as const;
+
+    for (const shift of shifts) {
+      const shiftColabs = result.filter(c => c.turno === shift);
+      const shiftTeams = newTeams.filter(t => t.shiftType === shift);
+
+      let cursor = 0;
+      for (const team of shiftTeams) {
+        const countToAssign = team.memberCount;
+        for (let i = 0; i < countToAssign && cursor < shiftColabs.length; i++) {
+          const colab = shiftColabs[cursor];
+          const pat = team.offPattern;
+
+          const escala = Array.from({ length: dias }, (_, d) => {
+            const dw = (startDay + d) % 7;
+            if (Array.isArray(pat)) {
+              return (dw === pat[0] || dw === pat[1]) ? 'OFF' : 'WORK';
+            }
+            const isOff = pat === 4 ? (dw === 4 || dw === 5) :
+                          pat === 5 ? (dw === 5 || dw === 6) :
+                          (dw === 6 || dw === 0);
+            return isOff ? 'OFF' : 'WORK';
+          }) as Colaborador['escala'];
+
+          const colabIdx = result.findIndex(c => c.id === colab.id);
+          if (colabIdx !== -1) {
+            result[colabIdx] = {
+              ...result[colabIdx],
+              team: team.name,
+              escala
+            };
+          }
+          cursor++;
+        }
+      }
+
+      while (cursor < shiftColabs.length) {
+        const colab = shiftColabs[cursor];
+        const colabIdx = result.findIndex(c => c.id === colab.id);
+        if (colabIdx !== -1) {
+          result[colabIdx] = {
+            ...result[colabIdx],
+            team: undefined,
+            escala: Array(dias).fill('WORK' as DayStatus)
+          };
+        }
+        cursor++;
+      }
+    }
+
+    return result;
+  };
+
   // State wrappers to automatically set the dirty flag on user edits
   const handleParamsChange = (newParams: ScheduleParams | ((prev: ScheduleParams) => ScheduleParams)) => {
     const resolved = typeof newParams === 'function' ? newParams(params) : newParams;
@@ -149,10 +205,14 @@ function App() {
           team: undefined,
           escala: Array(targetDias).fill('WORK' as DayStatus),
         }));
-        setColaboradores(scale);
-        setIsManualMode(false);
-        // Persist updated meses_data to params — use scale (not stale colaboradores)
-        setParams({ ...resolved, meses_data: { ...mesesData, [targetKey]: scale } });
+        // Apply teams to the generated collaborators
+        const startDay = (new Date(resolved.year!, resolved.month!, 1).getDay() + 6) % 7;
+        const applied = applyTeamsToColaboradores(scale, teams, startDay, targetDias);
+        const kept = applied.filter(c => c.team !== undefined);
+        setColaboradores(kept);
+        setIsManualMode(true);
+        // Persist updated meses_data to params — use kept (not stale colaboradores)
+        setParams({ ...resolved, meses_data: { ...mesesData, [targetKey]: kept } });
         setIsDirty(true);
         localStorage.setItem(`escala_saved_${currentKey}`, JSON.stringify(mesesData[currentKey] ?? []));
         return;
@@ -230,7 +290,7 @@ function App() {
                   ? new Date(data.params.year, data.params.month + 1, 0).getDate()
                   : (data.params.dias ?? 28);
 
-                // We can't call applyTeamsToColaboradores here (it's defined later in the component)
+                // applyTeamsToColaboradores is not applicable here (load uses raw DB data, not user teams)
                 // so we inline a minimal version for recovery
                 const recovered = [...loadedColabs];
                 const shifts = ['T1', 'T2', 'T3'] as const;
@@ -505,66 +565,6 @@ function App() {
   }, [isInitialLoadDone]);
 
   // Distribute collaborators to teams based on the configured memberCount
-  const applyTeamsToColaboradores = (colabs: Colaborador[], newTeams: TeamConfig[], startDay: number, dias: number): Colaborador[] => {
-    const result = [...colabs];
-    const shifts = ['T1', 'T2', 'T3'] as const;
-
-    for (const shift of shifts) {
-      // Find all collaborators in this shift
-      const shiftColabs = result.filter(c => c.turno === shift);
-      // Find all teams created for this shift
-      const shiftTeams = newTeams.filter(t => t.shiftType === shift);
-
-      let cursor = 0;
-      // Loop through each team and assign the corresponding number of collaborators
-      for (const team of shiftTeams) {
-        const countToAssign = team.memberCount;
-        for (let i = 0; i < countToAssign && cursor < shiftColabs.length; i++) {
-          const colab = shiftColabs[cursor];
-          const pat = team.offPattern;
-
-          const escala = Array.from({ length: dias }, (_, d) => {
-            const dw = (startDay + d) % 7;
-            if (Array.isArray(pat)) {
-              return (dw === pat[0] || dw === pat[1]) ? 'OFF' : 'WORK';
-            }
-            const isOff = pat === 4 ? (dw === 4 || dw === 5) :
-                          pat === 5 ? (dw === 5 || dw === 6) :
-                          (dw === 6 || dw === 0);
-            return isOff ? 'OFF' : 'WORK';
-          }) as Colaborador['escala'];
-
-          // Find this collaborator in the main list and update them
-          const colabIdx = result.findIndex(c => c.id === colab.id);
-          if (colabIdx !== -1) {
-            result[colabIdx] = {
-              ...result[colabIdx],
-              team: team.name,
-              escala
-            };
-          }
-          cursor++;
-        }
-      }
-
-      // For any remaining collaborators who didn't fit into any team, they go to the waiting area
-      while (cursor < shiftColabs.length) {
-        const colab = shiftColabs[cursor];
-        const colabIdx = result.findIndex(c => c.id === colab.id);
-        if (colabIdx !== -1) {
-          result[colabIdx] = {
-            ...result[colabIdx],
-            team: undefined,
-            escala: Array(dias).fill('WORK' as DayStatus) // Clear/gray escala in active days
-          };
-        }
-        cursor++;
-      }
-    }
-
-    return result;
-  };
-
   const saveToDatabase = async (
     colabs: Colaborador[],
     tms: TeamConfig[],
@@ -744,7 +744,16 @@ function App() {
       team: undefined,
       escala: Array(c.escala.length).fill('WORK' as DayStatus),
     }));
-    setColaboradores(scale);
+    // Apply teams to the generated collaborators
+    const startDay = (params.month !== undefined && params.year !== undefined)
+      ? (new Date(params.year, params.month, 1).getDay() + 6) % 7
+      : 0;
+    const dias = (params.month !== undefined && params.year !== undefined)
+      ? new Date(params.year, params.month + 1, 0).getDate()
+      : params.dias;
+    const applied = applyTeamsToColaboradores(scale, teams, startDay, dias);
+    const kept = applied.filter(c => c.team !== undefined);
+    setColaboradores(kept);
     setIsDirty(true);
   };
 
