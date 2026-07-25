@@ -19,9 +19,7 @@ import { fetchConfig, saveConfig } from './utils/apiClient';
 
 function App() {
   const [dbLoading, setDbLoading] = useState<boolean>(true);
-  const [syncStatus, setSyncStatus] = useState<'synced' | 'pending' | 'saving' | 'error'>('synced');
   const [isInitialLoadDone, setIsInitialLoadDone] = useState<boolean>(false);
-  const [isDirty, setIsDirty] = useState<boolean>(false);
 
   const [darkMode, setDarkMode] = useState<boolean>(() => {
     if (typeof window !== 'undefined') {
@@ -181,12 +179,10 @@ function App() {
     // Detect month/year change and persist/load colaboradores in the SAME render
     if (isInitialLoadDone && resolved.month !== undefined && resolved.month >= 0 &&
         (resolved.month !== params.month || resolved.year !== params.year)) {
-      // Compute correct days for the target month (dias in resolved may still be stale)
       const targetDias = (resolved.year !== undefined)
         ? new Date(resolved.year, resolved.month + 1, 0).getDate()
         : resolved.dias ?? 30;
 
-      // Build meses_data in memory: save current month, load target month
       const mesesData = { ...(params.meses_data ?? {}) } as Record<string, Colaborador[]>;
       const currentKey = `${params.month}_${params.year}`;
       const targetKey = `${resolved.month}_${resolved.year}`;
@@ -196,8 +192,11 @@ function App() {
       }
 
       const targetColabs = mesesData[targetKey];
+      let newColabs: Colaborador[];
+
       if (targetColabs) {
-        setColaboradores(targetColabs);
+        newColabs = targetColabs;
+        setColaboradores(newColabs);
         setIsManualMode(true);
       } else if (teams.length > 0) {
         const scale = generateSchedule({ ...resolved, dias: targetDias }).map(c => ({
@@ -205,47 +204,41 @@ function App() {
           team: undefined,
           escala: Array(targetDias).fill('WORK' as DayStatus),
         }));
-        // Apply teams to the generated collaborators
         const startDay = (new Date(resolved.year!, resolved.month!, 1).getDay() + 6) % 7;
         const applied = applyTeamsToColaboradores(scale, teams, startDay, targetDias);
-        const kept = applied.filter(c => c.team !== undefined);
-        setColaboradores(kept);
+        newColabs = applied.filter(c => c.team !== undefined);
+        setColaboradores(newColabs);
         setIsManualMode(true);
-        // Persist updated meses_data to params — use kept (not stale colaboradores)
-        setParams({ ...resolved, meses_data: { ...mesesData, [targetKey]: kept } });
-        setIsDirty(true);
-        localStorage.setItem(`escala_saved_${currentKey}`, JSON.stringify(mesesData[currentKey] ?? []));
-        return;
       } else {
-        setColaboradores([]);
+        newColabs = [];
+        setColaboradores(newColabs);
         setIsManualMode(false);
       }
 
-      // Persist updated meses_data to params
-      setParams({ ...resolved, meses_data: { ...mesesData, [targetKey]: targetColabs ?? [] } });
-      setIsDirty(true);
-      // Dev cache: also save to localStorage for offline access
+      const updatedParams = { ...resolved, meses_data: { ...mesesData, [targetKey]: newColabs } };
+      setParams(updatedParams);
+      saveToDatabase(newColabs, teams, updatedParams, demandaDiariaM3, demandaDiariaPcs);
       localStorage.setItem(`escala_saved_${currentKey}`, JSON.stringify(mesesData[currentKey] ?? []));
       return;
     }
 
     setParams(resolved);
-    setIsDirty(true);
+    saveToDatabase(colaboradores, teams, resolved, demandaDiariaM3, demandaDiariaPcs);
   };
 
   const handleColaboradoresChange = (newColabs: Colaborador[]) => {
     setColaboradores(newColabs);
-    setIsDirty(true);
+    saveToDatabase(newColabs, teams, params, demandaDiariaM3, demandaDiariaPcs);
   };
 
   const handleDemandaM3Change = (newDemanda: { [key: string]: number[] }) => {
     setDemandaDiariaM3(newDemanda);
-    setIsDirty(true);
+    saveToDatabase(colaboradores, teams, params, newDemanda, demandaDiariaPcs);
   };
 
   const handleDemandaPcsChange = (newDemanda: { [key: string]: number[] }) => {
     setDemandaDiariaPcs(newDemanda);
-    setIsDirty(true);
+    saveToDatabase(colaboradores, teams, params, demandaDiariaM3, newDemanda);
   };
 
   // Load from local database on init
@@ -322,8 +315,8 @@ function App() {
               }
             }
 
-            setColaboradores(loadedColabs);
-            localStorage.setItem('escala_colaboradores_auto', JSON.stringify(loadedColabs));
+            setColaboradores(loadedColabs.filter(c => c.team));
+            localStorage.setItem('escala_colaboradores_auto', JSON.stringify(loadedColabs.filter(c => c.team)));
             setIsManualMode(true);
           }
 
@@ -337,8 +330,9 @@ function App() {
               }
               const viewKey = `${data.params.month}_${data.params.year}`;
               if (mesesData[viewKey] && (!data.colaboradores || !Array.isArray(data.colaboradores) || data.colaboradores.length === 0)) {
-                setColaboradores(mesesData[viewKey]);
-                localStorage.setItem('escala_colaboradores_auto', JSON.stringify(mesesData[viewKey]));
+                const filtered = mesesData[viewKey].filter((c: Colaborador) => c.team);
+                setColaboradores(filtered);
+                localStorage.setItem('escala_colaboradores_auto', JSON.stringify(filtered));
                 setIsManualMode(true);
               }
             }
@@ -390,50 +384,6 @@ function App() {
     }
   }, [dbLoading]);
 
-  // Debounced Auto-save to local database — only fires when user makes an explicit change
-  useEffect(() => {
-    if (!isInitialLoadDone || !isDirty) return;
-
-    setSyncStatus('pending');
-
-    const delayDebounce = setTimeout(async () => {
-      setSyncStatus('saving');
-      // Use refs to read latest state (effect may not re-run when isDirty is already true)
-      const latestParams = paramsRef.current;
-      const latestColabs = colaboradoresRef.current;
-      const latestTeams = teamsRef.current;
-      const latestDemM3 = demandaM3Ref.current;
-      const latestDemPcs = demandaPcsRef.current;
-      // Build meses_data from in-memory params.meses_data + current colaboradores
-      const mesesData = { ...((latestParams as any).meses_data ?? {}) } as Record<string, Colaborador[]>;
-      const currentKey = `${latestParams.month}_${latestParams.year}`;
-      if (latestColabs.length > 0) {
-        mesesData[currentKey] = latestColabs;
-      } else {
-        delete mesesData[currentKey];
-      }
-
-      try {
-        await saveConfig({
-          colaboradores: latestColabs,
-          teams: latestTeams,
-          params: { ...latestParams, meses_data: mesesData },
-          demanda_m3: latestDemM3,
-          demanda_pcs: latestDemPcs,
-        });
-        setSyncStatus('synced');
-        setIsDirty(false);
-      } catch (err) {
-        console.error("Erro ao salvar no banco:", err);
-        setSyncStatus('error');
-      }
-    }, 1500);
-
-    return () => clearTimeout(delayDebounce);
-  // NOTE: colaboradores/teams/params are NOT in the dep array — we only want this to fire when isDirty flips true
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isDirty, isInitialLoadDone]);
-
   // Refs to always read latest state inside async callbacks (debounce, realtime)
   const paramsRef = useRef(params);
   paramsRef.current = params;
@@ -445,10 +395,6 @@ function App() {
   demandaM3Ref.current = demandaDiariaM3;
   const demandaPcsRef = useRef(demandaDiariaPcs);
   demandaPcsRef.current = demandaDiariaPcs;
-  const isDirtyRef = useRef(isDirty);
-  isDirtyRef.current = isDirty;
-  const syncStatusRef = useRef(syncStatus);
-  syncStatusRef.current = syncStatus;
 
   // Distribute collaborators to teams based on the configured memberCount
   const saveToDatabase = async (
@@ -477,11 +423,8 @@ function App() {
         demanda_m3: demM3,
         demanda_pcs: demPcs,
       });
-      setSyncStatus('synced');
-      setIsDirty(false);
     } catch (err) {
       console.error("Erro ao salvar no banco:", err);
-      setSyncStatus('error');
     }
   };
 
@@ -495,7 +438,6 @@ function App() {
     if (newTeams.length === 0) {
       setColaboradores([]);
       setIsManualMode(true);
-      setIsDirty(false);
       // Clear current month from meses_data
       delete updatedMesesData[currentKey];
       // Clear all other months
@@ -537,7 +479,6 @@ function App() {
       const kept = updated.filter(c => c.team !== undefined);
       setColaboradores(kept);
       setIsManualMode(true);
-      setIsDirty(false);
 
       // Persist current month into meses_data
       if (kept.length > 0) {
@@ -611,7 +552,7 @@ function App() {
   const handleRecalculate = () => {
     if (teams.length === 0) {
       setColaboradores([]);
-      setIsDirty(true);
+      saveToDatabase([], teams, params, demandaDiariaM3, demandaDiariaPcs);
       return;
     }
     const scale = generateSchedule(params).map(c => ({
@@ -619,7 +560,6 @@ function App() {
       team: undefined,
       escala: Array(c.escala.length).fill('WORK' as DayStatus),
     }));
-    // Apply teams to the generated collaborators
     const startDay = (params.month !== undefined && params.year !== undefined)
       ? (new Date(params.year, params.month, 1).getDay() + 6) % 7
       : 0;
@@ -629,7 +569,7 @@ function App() {
     const applied = applyTeamsToColaboradores(scale, teams, startDay, dias);
     const kept = applied.filter(c => c.team !== undefined);
     setColaboradores(kept);
-    setIsDirty(true);
+    saveToDatabase(kept, teams, params, demandaDiariaM3, demandaDiariaPcs);
   };
 
   // Run on initial mount or parameters change (only if not in manual mode)
@@ -769,28 +709,6 @@ function App() {
           </div>
 
           <div className="flex items-center gap-4 flex-wrap">
-            {/* Sync Status (Auto-save) */}
-            <div className="flex items-center gap-2 bg-white/10 border border-white/20 p-2.5 px-4 rounded-xl backdrop-blur-md text-xs">
-              <span className="font-bold uppercase tracking-wider text-[9.5px]">
-                {syncStatus === 'synced' && <span className="text-emerald-400">● Salvo</span>}
-                {syncStatus === 'pending' && <span className="text-amber-400">● Salvando automaticamente...</span>}
-                {syncStatus === 'saving' && <span className="text-blue-300 animate-pulse">● Salvando...</span>}
-                {syncStatus === 'error' && <span className="text-rose-400">● Erro ao salvar</span>}
-              </span>
-            </div>
-
-            {/* Manual Save Button */}
-            <button
-              onClick={() => {
-                setIsDirty(false);
-                saveToDatabase(colaboradores, teams, params, demandaDiariaM3, demandaDiariaPcs);
-              }}
-              className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-black bg-emerald-600 hover:bg-emerald-750 text-white transition cursor-pointer shadow-md hover:shadow-lg"
-              title="Salvar dados no banco imediatamente"
-            >
-              Salvar no Banco
-            </button>
-
             <button
               onClick={toggleDarkMode}
               className="p-2.5 rounded-xl bg-white/10 hover:bg-white/20 transition backdrop-blur-md border border-white/20 cursor-pointer"
@@ -973,7 +891,7 @@ function App() {
 
               {/* Part 2: Interactive Grid */}
               <CalendarGrid 
-                colaboradores={colaboradores} 
+                colaboradores={colaboradores.filter(c => c.team)} 
                 diasCount={diasNum} 
                 month={params.month} 
                 year={params.year} 
