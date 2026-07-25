@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { ParametersForm } from './components/Schedule/ParametersForm';
 import { CalendarGrid } from './components/Schedule/CalendarGrid';
 import { generateSchedule } from './utils/scheduleEngine';
@@ -267,6 +267,20 @@ function App() {
           if (data.params && typeof data.params === 'object' && Object.keys(data.params).length > 0) {
             setParams(data.params);
             localStorage.setItem('scheduleParams', JSON.stringify(data.params));
+            // Restore all months' colaboradores from meses_data if available
+            const mesesData = (data.params as any).meses_data as Record<string, Colaborador[]> | undefined;
+            if (mesesData) {
+              for (const [key, colabs] of Object.entries(mesesData)) {
+                localStorage.setItem(`escala_saved_${key}`, JSON.stringify(colabs));
+              }
+              // If current view's month has data in meses, use it
+              const viewKey = `${data.params.month}_${data.params.year}`;
+              if (mesesData[viewKey] && (!data.colaboradores || !Array.isArray(data.colaboradores) || data.colaboradores.length === 0)) {
+                setColaboradores(mesesData[viewKey]);
+                localStorage.setItem('escala_colaboradores_auto', JSON.stringify(mesesData[viewKey]));
+                setIsManualMode(true);
+              }
+            }
           }
           if (data.demanda_m3) {
             setDemandaDiariaM3(data.demanda_m3);
@@ -305,6 +319,22 @@ function App() {
 
     const delayDebounce = setTimeout(async () => {
       setSyncStatus('saving');
+      // Build meses_data from all localStorage saved months + current
+      const mesesData: Record<string, Colaborador[]> = {};
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith('escala_saved_')) {
+          const saved = localStorage.getItem(key);
+          if (saved) {
+            try { mesesData[key.replace('escala_saved_', '')] = JSON.parse(saved); } catch {}
+          }
+        }
+      }
+      const currentKey = `${params.month}_${params.year}`;
+      if (colaboradores.length > 0 || mesesData[currentKey]) {
+        mesesData[currentKey] = colaboradores;
+      }
+
       try {
         const { error } = await client
           .from('escala_config')
@@ -312,7 +342,7 @@ function App() {
             id: 1,
             colaboradores,
             teams,
-            params,
+            params: { ...params, meses_data: mesesData },
             demanda_m3: demandaDiariaM3,
             demanda_pcs: demandaDiariaPcs,
             updated_at: new Date().toISOString(),
@@ -335,6 +365,16 @@ function App() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isDirty, isInitialLoadDone]);
 
+  // Refs to avoid tearing down the realtime channel on every state change
+  const paramsRef = useRef(params);
+  paramsRef.current = params;
+  const colaboradoresRef = useRef(colaboradores);
+  colaboradoresRef.current = colaboradores;
+  const isDirtyRef = useRef(isDirty);
+  isDirtyRef.current = isDirty;
+  const syncStatusRef = useRef(syncStatus);
+  syncStatusRef.current = syncStatus;
+
   // Real-time listener for changes from other users
   useEffect(() => {
     const client = supabase;
@@ -349,27 +389,69 @@ function App() {
           console.log("Recebido update via Realtime:", payload.new);
           const newDoc = payload.new as any;
           if (newDoc && newDoc.id === 1) {
-            // Only update local state if we don't have unsaved local edits
-            if (!isDirty && syncStatus !== 'saving') {
-              if (newDoc.colaboradores) {
-                setColaboradores(newDoc.colaboradores);
-                localStorage.setItem('escala_colaboradores_auto', JSON.stringify(newDoc.colaboradores));
+            // Use refs to read latest state without closing over stale values
+            const currentIsDirty = isDirtyRef.current;
+            const currentSyncStatus = syncStatusRef.current;
+            const currentColabs = colaboradoresRef.current;
+            const currentParams = paramsRef.current;
+
+            if (!currentIsDirty && currentSyncStatus !== 'saving') {
+              // Save current colaboradores to their month key before accepting updates
+              if (currentColabs.length > 0 && currentParams.month !== undefined && currentParams.year !== undefined) {
+                localStorage.setItem(
+                  `escala_saved_${currentParams.month}_${currentParams.year}`,
+                  JSON.stringify(currentColabs)
+                );
               }
+
+              // Always update teams (global config)
               if (newDoc.teams) {
                 setTeams(newDoc.teams);
                 localStorage.setItem('escala_teams_config', JSON.stringify(newDoc.teams));
               }
+
+              // Use meses_data (all months) if available — this is the global sync approach
+              const mesesData = newDoc.params?.meses_data as Record<string, Colaborador[]> | undefined;
+              if (mesesData) {
+                // Restore every month into localStorage
+                for (const [key, colabs] of Object.entries(mesesData)) {
+                  localStorage.setItem(`escala_saved_${key}`, JSON.stringify(colabs));
+                }
+                // Set current view's colaboradores from meses_data
+                const viewKey = `${currentParams.month}_${currentParams.year}`;
+                if (mesesData[viewKey]) {
+                  setColaboradores(mesesData[viewKey]);
+                  localStorage.setItem('escala_colaboradores_auto', JSON.stringify(mesesData[viewKey]));
+                }
+              } else {
+                // Legacy fallback: single-month colaboradores
+                const remoteMonth = newDoc.params?.month;
+                const remoteYear = newDoc.params?.year;
+                if (newDoc.colaboradores && remoteMonth !== undefined && remoteYear !== undefined) {
+                  localStorage.setItem(
+                    `escala_saved_${remoteMonth}_${remoteYear}`,
+                    JSON.stringify(newDoc.colaboradores)
+                  );
+                }
+                if (remoteMonth === currentParams.month && remoteYear === currentParams.year && newDoc.colaboradores) {
+                  setColaboradores(newDoc.colaboradores);
+                  localStorage.setItem('escala_colaboradores_auto', JSON.stringify(newDoc.colaboradores));
+                }
+              }
+
+              // Update params but preserve our month/year so we don't jump views
               if (newDoc.params) {
-                setParams(newDoc.params);
-                localStorage.setItem('scheduleParams', JSON.stringify(newDoc.params));
-              }
-              if (newDoc.demanda_m3) {
-                setDemandaDiariaM3(newDoc.demanda_m3);
-                localStorage.setItem('demandaDiaria_m3', JSON.stringify(newDoc.demanda_m3));
-              }
-              if (newDoc.demanda_pcs) {
-                setDemandaDiariaPcs(newDoc.demanda_pcs);
-                localStorage.setItem('demandaDiaria_pcs', JSON.stringify(newDoc.demanda_pcs));
+                const { month, year, meses_data, ...restParams } = newDoc.params;
+                setParams(prev => ({ ...prev, ...restParams, meses_data: mesesData ?? prev.meses_data }));
+                const saved = localStorage.getItem('scheduleParams');
+                if (saved) {
+                  try {
+                    const parsed = JSON.parse(saved);
+                    Object.assign(parsed, restParams);
+                    if (mesesData) parsed.meses_data = mesesData;
+                    localStorage.setItem('scheduleParams', JSON.stringify(parsed));
+                  } catch {}
+                }
               }
             }
           }
@@ -380,7 +462,7 @@ function App() {
     return () => {
       client.removeChannel(channel);
     };
-  }, [isInitialLoadDone, isDirty, syncStatus]);
+  }, [isInitialLoadDone]);
 
   // Distribute collaborators to teams based on the configured memberCount
   const applyTeamsToColaboradores = (colabs: Colaborador[], newTeams: TeamConfig[], startDay: number, dias: number): Colaborador[] => {
@@ -453,6 +535,23 @@ function App() {
     const client = supabase;
     if (!client) return;
     setSyncStatus('saving');
+
+    // Build meses_data from all localStorage saved months + current
+    const mesesData: Record<string, Colaborador[]> = {};
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith('escala_saved_')) {
+        const saved = localStorage.getItem(key);
+        if (saved) {
+          try { mesesData[key.replace('escala_saved_', '')] = JSON.parse(saved); } catch {}
+        }
+      }
+    }
+    const currentKey = `${pms.month}_${pms.year}`;
+    if (colabs.length > 0 || mesesData[currentKey]) {
+      mesesData[currentKey] = colabs;
+    }
+
     try {
       const { error } = await client
         .from('escala_config')
@@ -460,7 +559,7 @@ function App() {
           id: 1,
           colaboradores: colabs,
           teams: tms,
-          params: pms,
+          params: { ...pms, meses_data: mesesData },
           demanda_m3: demM3,
           demanda_pcs: demPcs,
           updated_at: new Date().toISOString(),

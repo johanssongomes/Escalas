@@ -76,4 +76,5 @@ export interface ScheduleParams {
   setor: 'comercio' | 'supermercado';
   month?: number; // 0-11 (Jan-Dec)
   year?: number;
+  meses_data?: Record<string, Colaborador[]>; // all months' colaboradores for global sync
 }
