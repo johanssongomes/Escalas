@@ -125,25 +125,24 @@ function App() {
     // Detect month/year change and persist/load colaboradores in the SAME render
     if (isInitialLoadDone && resolved.month !== undefined && resolved.month >= 0 &&
         (resolved.month !== params.month || resolved.year !== params.year)) {
-      // Save current month's colaboradores before leaving it
-      if (colaboradores.length > 0 && params.month !== undefined && params.month >= 0 && params.year !== undefined) {
-        localStorage.setItem(
-          `escala_saved_${params.month}_${params.year}`,
-          JSON.stringify(colaboradores)
-        );
-      }
       // Compute correct days for the target month (dias in resolved may still be stale)
       const targetDias = (resolved.year !== undefined)
         ? new Date(resolved.year, resolved.month + 1, 0).getDate()
         : resolved.dias ?? 30;
 
-      const savedKey = `escala_saved_${resolved.month}_${resolved.year}`;
-      const saved = localStorage.getItem(savedKey);
-      if (saved) {
-        try {
-          setColaboradores(JSON.parse(saved));
-          setIsManualMode(true);
-        } catch {}
+      // Build meses_data in memory: save current month, load target month
+      const mesesData = { ...(params.meses_data ?? {}) } as Record<string, Colaborador[]>;
+      const currentKey = `${params.month}_${params.year}`;
+      const targetKey = `${resolved.month}_${resolved.year}`;
+
+      if (colaboradores.length > 0 && params.month !== undefined && params.month >= 0 && params.year !== undefined) {
+        mesesData[currentKey] = colaboradores;
+      }
+
+      const targetColabs = mesesData[targetKey];
+      if (targetColabs) {
+        setColaboradores(targetColabs);
+        setIsManualMode(true);
       } else {
         const scale = generateSchedule({ ...resolved, dias: targetDias }).map(c => ({
           ...c,
@@ -153,6 +152,13 @@ function App() {
         setColaboradores(scale);
         setIsManualMode(false);
       }
+
+      // Persist updated meses_data to params so auto-save sends it to Supabase
+      setParams({ ...resolved, meses_data: { ...mesesData, [targetKey]: targetColabs ?? colaboradores } });
+      setIsDirty(true);
+      // Dev cache: also save to localStorage for offline access
+      localStorage.setItem(`escala_saved_${currentKey}`, JSON.stringify(mesesData[currentKey] ?? []));
+      return;
     }
 
     setParams(resolved);
@@ -319,19 +325,10 @@ function App() {
 
     const delayDebounce = setTimeout(async () => {
       setSyncStatus('saving');
-      // Build meses_data from all localStorage saved months + current
-      const mesesData: Record<string, Colaborador[]> = {};
-      for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i);
-        if (key && key.startsWith('escala_saved_')) {
-          const saved = localStorage.getItem(key);
-          if (saved) {
-            try { mesesData[key.replace('escala_saved_', '')] = JSON.parse(saved); } catch {}
-          }
-        }
-      }
+      // Build meses_data from in-memory params.meses_data + current colaboradores
+      const mesesData = { ...((params as any).meses_data ?? {}) } as Record<string, Colaborador[]>;
       const currentKey = `${params.month}_${params.year}`;
-      if (colaboradores.length > 0 || mesesData[currentKey]) {
+      if (colaboradores.length > 0) {
         mesesData[currentKey] = colaboradores;
       }
 
@@ -536,19 +533,10 @@ function App() {
     if (!client) return;
     setSyncStatus('saving');
 
-    // Build meses_data from all localStorage saved months + current
-    const mesesData: Record<string, Colaborador[]> = {};
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (key && key.startsWith('escala_saved_')) {
-        const saved = localStorage.getItem(key);
-        if (saved) {
-          try { mesesData[key.replace('escala_saved_', '')] = JSON.parse(saved); } catch {}
-        }
-      }
-    }
+    // Build meses_data from in-memory params.meses_data + current colaboradores
+    const mesesData = { ...((pms as any).meses_data ?? {}) } as Record<string, Colaborador[]>;
     const currentKey = `${pms.month}_${pms.year}`;
-    if (colabs.length > 0 || mesesData[currentKey]) {
+    if (colabs.length > 0) {
       mesesData[currentKey] = colabs;
     }
 
