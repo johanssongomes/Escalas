@@ -15,7 +15,7 @@ import { Charts } from './components/Dashboard/Charts';
 import { ShiftTimeline } from './components/Dashboard/ShiftTimeline';
 import { calculateDailyCoverage, calculateWeeklyCoverage } from './utils/coverageEngine';
 import { calculateIndicators } from './utils/dashboardEngine';
-import { supabase } from './utils/supabaseClient';
+import { fetchConfig, saveConfig } from './utils/apiClient';
 
 function App() {
   const [dbLoading, setDbLoading] = useState<boolean>(true);
@@ -248,21 +248,12 @@ function App() {
     setIsDirty(true);
   };
 
-  // Load from Supabase on init
+  // Load from local database on init
   useEffect(() => {
-    const client = supabase;
-    if (!client) {
-      console.warn("Supabase não configurado. Rodando em modo local.");
-      setDbLoading(false);
-      return;
-    }
-    const activeClient = client;
     async function loadData() {
       try {
-        const { data, error } = await activeClient.from('escala_config').select('*').eq('id', 1).single();
-        if (error) {
-          console.error("Erro ao carregar dados do Supabase:", error);
-        } else if (data) {
+        const data = await fetchConfig();
+        if (data && data.id) {
           let loadedColabs: Colaborador[] = [];
           let loadedTeams: TeamConfig[] = [];
 
@@ -276,12 +267,10 @@ function App() {
             loadedColabs = data.colaboradores;
 
             if (loadedColabs.length > 0) {
-              // Check if the DB has corrupted data: colabs exist but none have a team assigned
               const hasTeamData = loadedColabs.some(c => c.team !== undefined && c.team !== null);
               const hasEscalaData = loadedColabs.some(c => c.escala && c.escala.some(d => d !== 'WORK'));
 
               if (!hasTeamData && !hasEscalaData && loadedTeams.length > 0 && data.params) {
-                // Auto-recover: DB has wiped state — re-apply teams now
                 console.warn("DB tem dados zerados — reaplicando equipes automaticamente...");
                 const sDay = (data.params.month !== undefined && data.params.year !== undefined)
                   ? (new Date(data.params.year, data.params.month, 1).getDay() + 6) % 7
@@ -290,8 +279,6 @@ function App() {
                   ? new Date(data.params.year, data.params.month + 1, 0).getDate()
                   : (data.params.dias ?? 28);
 
-                // applyTeamsToColaboradores is not applicable here (load uses raw DB data, not user teams)
-                // so we inline a minimal version for recovery
                 const recovered = [...loadedColabs];
                 const shifts = ['T1', 'T2', 'T3'] as const;
                 for (const shift of shifts) {
@@ -315,16 +302,18 @@ function App() {
                   }
                 }
                 loadedColabs = recovered;
-                // Save the recovered state back to Supabase immediately
                 try {
-                  await activeClient.from('escala_config').upsert({
-                    id: 1,
+                  const mesesData = { ...((data.params as any).meses_data ?? {}) } as Record<string, Colaborador[]>;
+                  const currentKey = `${data.params.month}_${data.params.year}`;
+                  if (recovered.length > 0) {
+                    mesesData[currentKey] = recovered;
+                  }
+                  await saveConfig({
                     colaboradores: recovered,
                     teams: loadedTeams,
-                    params: data.params,
+                    params: { ...data.params, meses_data: mesesData },
                     demanda_m3: data.demanda_m3,
                     demanda_pcs: data.demanda_pcs,
-                    updated_at: new Date().toISOString(),
                   });
                   console.log("Estado recuperado e salvo no banco com sucesso.");
                 } catch (saveErr) {
@@ -341,13 +330,11 @@ function App() {
           if (data.params && typeof data.params === 'object' && Object.keys(data.params).length > 0) {
             setParams(data.params);
             localStorage.setItem('scheduleParams', JSON.stringify(data.params));
-            // Restore all months' colaboradores from meses_data if available
             const mesesData = (data.params as any).meses_data as Record<string, Colaborador[]> | undefined;
             if (mesesData) {
               for (const [key, colabs] of Object.entries(mesesData)) {
                 localStorage.setItem(`escala_saved_${key}`, JSON.stringify(colabs));
               }
-              // If current view's month has data in meses, use it
               const viewKey = `${data.params.month}_${data.params.year}`;
               if (mesesData[viewKey] && (!data.colaboradores || !Array.isArray(data.colaboradores) || data.colaboradores.length === 0)) {
                 setColaboradores(mesesData[viewKey]);
@@ -368,8 +355,6 @@ function App() {
       } catch (err) {
         console.error("Falha de conexão com o banco de dados:", err);
       } finally {
-        // After DB load, if there are no teams, ensure colaboradores are empty
-        // Use setTimeout to let batched state updates settle before reading latest values
         setTimeout(() => {
           setTeams(currentTeams => {
             if (currentTeams.length === 0) {
@@ -405,10 +390,9 @@ function App() {
     }
   }, [dbLoading]);
 
-  // Debounced Auto-save to Supabase — only fires when user makes an explicit change
+  // Debounced Auto-save to local database — only fires when user makes an explicit change
   useEffect(() => {
-    const client = supabase;
-    if (!isInitialLoadDone || !client || !isDirty) return;
+    if (!isInitialLoadDone || !isDirty) return;
 
     setSyncStatus('pending');
 
@@ -430,24 +414,15 @@ function App() {
       }
 
       try {
-        const { error } = await client
-          .from('escala_config')
-          .upsert({
-            id: 1,
-            colaboradores: latestColabs,
-            teams: latestTeams,
-            params: { ...latestParams, meses_data: mesesData },
-            demanda_m3: latestDemM3,
-            demanda_pcs: latestDemPcs,
-            updated_at: new Date().toISOString(),
-          });
-        if (error) {
-          console.error("Erro ao salvar no banco:", error);
-          setSyncStatus('error');
-        } else {
-          setSyncStatus('synced');
-          setIsDirty(false);
-        }
+        await saveConfig({
+          colaboradores: latestColabs,
+          teams: latestTeams,
+          params: { ...latestParams, meses_data: mesesData },
+          demanda_m3: latestDemM3,
+          demanda_pcs: latestDemPcs,
+        });
+        setSyncStatus('synced');
+        setIsDirty(false);
       } catch (err) {
         console.error("Erro ao salvar no banco:", err);
         setSyncStatus('error');
@@ -475,95 +450,6 @@ function App() {
   const syncStatusRef = useRef(syncStatus);
   syncStatusRef.current = syncStatus;
 
-  // Real-time listener for changes from other users
-  useEffect(() => {
-    const client = supabase;
-    if (!isInitialLoadDone || !client) return;
-
-    const channel = client
-      .channel('escala_realtime')
-      .on(
-        'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'escala_config' },
-        (payload) => {
-          console.log("Recebido update via Realtime:", payload.new);
-          const newDoc = payload.new as any;
-          if (newDoc && newDoc.id === 1) {
-            // Use refs to read latest state without closing over stale values
-            const currentIsDirty = isDirtyRef.current;
-            const currentSyncStatus = syncStatusRef.current;
-            const currentColabs = colaboradoresRef.current;
-            const currentParams = paramsRef.current;
-
-            if (!currentIsDirty && currentSyncStatus !== 'saving') {
-              // Save current colaboradores to their month key before accepting updates
-              if (currentColabs.length > 0 && currentParams.month !== undefined && currentParams.year !== undefined) {
-                localStorage.setItem(
-                  `escala_saved_${currentParams.month}_${currentParams.year}`,
-                  JSON.stringify(currentColabs)
-                );
-              }
-
-              // Always update teams (global config)
-              if (newDoc.teams) {
-                setTeams(newDoc.teams);
-                localStorage.setItem('escala_teams_config', JSON.stringify(newDoc.teams));
-              }
-
-              // Use meses_data (all months) if available — this is the global sync approach
-              const mesesData = newDoc.params?.meses_data as Record<string, Colaborador[]> | undefined;
-              if (mesesData) {
-                // Restore every month into localStorage
-                for (const [key, colabs] of Object.entries(mesesData)) {
-                  localStorage.setItem(`escala_saved_${key}`, JSON.stringify(colabs));
-                }
-                // Set current view's colaboradores from meses_data
-                const viewKey = `${currentParams.month}_${currentParams.year}`;
-                if (mesesData[viewKey]) {
-                  setColaboradores(mesesData[viewKey]);
-                  localStorage.setItem('escala_colaboradores_auto', JSON.stringify(mesesData[viewKey]));
-                }
-              } else {
-                // Legacy fallback: single-month colaboradores
-                const remoteMonth = newDoc.params?.month;
-                const remoteYear = newDoc.params?.year;
-                if (newDoc.colaboradores && remoteMonth !== undefined && remoteYear !== undefined) {
-                  localStorage.setItem(
-                    `escala_saved_${remoteMonth}_${remoteYear}`,
-                    JSON.stringify(newDoc.colaboradores)
-                  );
-                }
-                if (remoteMonth === currentParams.month && remoteYear === currentParams.year && newDoc.colaboradores) {
-                  setColaboradores(newDoc.colaboradores);
-                  localStorage.setItem('escala_colaboradores_auto', JSON.stringify(newDoc.colaboradores));
-                }
-              }
-
-              // Update params but preserve our month/year so we don't jump views
-              if (newDoc.params) {
-                const { month, year, meses_data, ...restParams } = newDoc.params;
-                setParams(prev => ({ ...prev, ...restParams, meses_data: mesesData ?? prev.meses_data }));
-                const saved = localStorage.getItem('scheduleParams');
-                if (saved) {
-                  try {
-                    const parsed = JSON.parse(saved);
-                    Object.assign(parsed, restParams);
-                    if (mesesData) parsed.meses_data = mesesData;
-                    localStorage.setItem('scheduleParams', JSON.stringify(parsed));
-                  } catch {}
-                }
-              }
-            }
-          }
-        }
-      )
-      .subscribe();
-
-    return () => {
-      client.removeChannel(channel);
-    };
-  }, [isInitialLoadDone]);
-
   // Distribute collaborators to teams based on the configured memberCount
   const saveToDatabase = async (
     colabs: Colaborador[],
@@ -572,8 +458,6 @@ function App() {
     demM3: typeof demandaDiariaM3,
     demPcs: typeof demandaDiariaPcs
   ) => {
-    const client = supabase;
-    if (!client) return;
     setSyncStatus('saving');
 
     // Build meses_data from in-memory params.meses_data + current colaboradores
@@ -586,24 +470,15 @@ function App() {
     }
 
     try {
-      const { error } = await client
-        .from('escala_config')
-        .upsert({
-          id: 1,
-          colaboradores: colabs,
-          teams: tms,
-          params: { ...pms, meses_data: mesesData },
-          demanda_m3: demM3,
-          demanda_pcs: demPcs,
-          updated_at: new Date().toISOString(),
-        });
-      if (error) {
-        console.error("Erro ao salvar no banco:", error);
-        setSyncStatus('error');
-      } else {
-        setSyncStatus('synced');
-        setIsDirty(false);
-      }
+      await saveConfig({
+        colaboradores: colabs,
+        teams: tms,
+        params: { ...pms, meses_data: mesesData },
+        demanda_m3: demM3,
+        demanda_pcs: demPcs,
+      });
+      setSyncStatus('synced');
+      setIsDirty(false);
     } catch (err) {
       console.error("Erro ao salvar no banco:", err);
       setSyncStatus('error');
@@ -856,7 +731,7 @@ function App() {
       <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col items-center justify-center text-slate-800 dark:text-slate-100 transition-colors duration-200">
         <div className="flex flex-col items-center gap-4">
           <Truck className="w-12 h-12 text-blue-600 animate-bounce" />
-          <p className="font-bold text-sm tracking-wide">Carregando dados da nuvem (Supabase)...</p>
+          <p className="font-bold text-sm tracking-wide">Carregando dados do banco local...</p>
           <div className="w-48 bg-slate-200 dark:bg-slate-850 h-1.5 rounded-full overflow-hidden">
             <div className="bg-blue-600 h-full w-2/3 animate-pulse rounded-full"></div>
           </div>
@@ -894,12 +769,12 @@ function App() {
           </div>
 
           <div className="flex items-center gap-4 flex-wrap">
-            {/* Cloud Sync Status (Auto-save) */}
+            {/* Sync Status (Auto-save) */}
             <div className="flex items-center gap-2 bg-white/10 border border-white/20 p-2.5 px-4 rounded-xl backdrop-blur-md text-xs">
               <span className="font-bold uppercase tracking-wider text-[9.5px]">
-                {syncStatus === 'synced' && <span className="text-emerald-400">● Sincronizado</span>}
+                {syncStatus === 'synced' && <span className="text-emerald-400">● Salvo</span>}
                 {syncStatus === 'pending' && <span className="text-amber-400">● Salvando automaticamente...</span>}
-                {syncStatus === 'saving' && <span className="text-blue-300 animate-pulse">● Salvando na Nuvem...</span>}
+                {syncStatus === 'saving' && <span className="text-blue-300 animate-pulse">● Salvando...</span>}
                 {syncStatus === 'error' && <span className="text-rose-400">● Erro ao salvar</span>}
               </span>
             </div>
@@ -911,9 +786,9 @@ function App() {
                 saveToDatabase(colaboradores, teams, params, demandaDiariaM3, demandaDiariaPcs);
               }}
               className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-black bg-emerald-600 hover:bg-emerald-750 text-white transition cursor-pointer shadow-md hover:shadow-lg"
-              title="Salvar dados na nuvem imediatamente"
+              title="Salvar dados no banco imediatamente"
             >
-              Salvar na Nuvem
+              Salvar no Banco
             </button>
 
             <button

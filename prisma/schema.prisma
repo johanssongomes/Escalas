@@ -1,0 +1,18 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model EscalaConfig {
+  id           Int      @id @default(1)
+  colaboradores Json?
+  teams        Json?
+  params       Json?
+  demanda_m3   Json?
+  demanda_pcs  Json?
+  updated_at   DateTime @default(now()) @db.Timestamptz
+}
