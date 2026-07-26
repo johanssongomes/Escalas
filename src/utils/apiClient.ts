@@ -20,3 +20,67 @@ export async function saveConfig(data: {
   });
   if (!res.ok) throw new Error(`Erro ao salvar config: ${res.status}`);
 }
+
+export interface ScenarioSummary {
+  id: number;
+  name: string;
+  created_at: string;
+}
+
+export async function listScenarios(): Promise<ScenarioSummary[]> {
+  const res = await fetch(`${API_BASE}/scenarios`);
+  if (!res.ok) throw new Error(`Erro ao listar cenários: ${res.status}`);
+  return res.json();
+}
+
+export interface ScenarioData {
+  id: number;
+  name: string;
+  teams?: any;
+  params?: any;
+  demanda_m3?: any;
+  demanda_pcs?: any;
+  created_at: string;
+}
+
+export async function getScenario(id: number): Promise<ScenarioData> {
+  const res = await fetch(`${API_BASE}/scenarios/${id}`);
+  if (!res.ok) throw new Error(`Erro ao buscar cenário: ${res.status}`);
+  return res.json();
+}
+
+export async function createScenario(data: {
+  name: string;
+  teams?: any;
+  params?: any;
+  demanda_m3?: any;
+  demanda_pcs?: any;
+}): Promise<ScenarioData> {
+  const res = await fetch(`${API_BASE}/scenarios`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error(`Erro ao criar cenário: ${res.status}`);
+  return res.json();
+}
+
+export async function deleteScenario(id: number): Promise<void> {
+  const res = await fetch(`${API_BASE}/scenarios/${id}`, { method: 'DELETE' });
+  if (!res.ok) throw new Error(`Erro ao deletar cenário: ${res.status}`);
+}
+
+export async function updateScenario(id: number, data: {
+  teams?: any;
+  params?: any;
+  demanda_m3?: any;
+  demanda_pcs?: any;
+}): Promise<ScenarioData> {
+  const res = await fetch(`${API_BASE}/scenarios/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error(`Erro ao atualizar cenário: ${res.status}`);
+  return res.json();
+}

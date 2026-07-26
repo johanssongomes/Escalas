@@ -53,6 +53,12 @@ const SHIFT_LABELS: Record<ShiftType, string> = {
   T3: '3º Turno (T3)',
 };
 
+const SHIFT_DEFAULT_COLOR: Record<ShiftType, TeamConfig['colorKey']> = {
+  T1: 'emerald',
+  T2: 'amber',
+  T3: 'indigo',
+};
+
 function generateId(): string {
   return Math.random().toString(36).slice(2, 10);
 }
@@ -279,7 +285,7 @@ interface AddTeamFormProps {
 
 const AddTeamForm: React.FC<AddTeamFormProps> = ({ shift, remaining, onAdd, onCancel }) => {
   const [name, setName] = useState('');
-  const [colorKey, setColorKey] = useState<TeamConfig['colorKey']>('emerald');
+  const [colorKey, setColorKey] = useState<TeamConfig['colorKey']>(SHIFT_DEFAULT_COLOR[shift]);
   const [offPattern, setOffPattern] = useState<TeamConfig['offPattern']>(5);
   const [count, setCount] = useState(Math.max(0, remaining));
   const [showColorPicker, setShowColorPicker] = useState(false);

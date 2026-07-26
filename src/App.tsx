@@ -20,6 +20,9 @@ import { fetchConfig, saveConfig } from './utils/apiClient';
 function App() {
   const [dbLoading, setDbLoading] = useState<boolean>(true);
   const [isInitialLoadDone, setIsInitialLoadDone] = useState<boolean>(false);
+  // Tracks whether valid data was loaded from DB — prevents handleRecalculate from
+  // overwriting DB-loaded data due to the isInitialLoadDone effect firing after 800ms
+  const dbLoadedRef = useRef(false);
 
   const [darkMode, setDarkMode] = useState<boolean>(() => {
     if (typeof window !== 'undefined') {
@@ -37,6 +40,7 @@ function App() {
           const parsed = JSON.parse(saved);
           if (parsed.month === undefined) parsed.month = today.getMonth();
           if (parsed.year === undefined) parsed.year = today.getFullYear();
+          delete parsed.meses_data;
           return parsed;
         } catch (e) {
           console.error("Failed to parse scheduleParams from localStorage", e);
@@ -64,32 +68,17 @@ function App() {
     localStorage.setItem('scheduleParams', JSON.stringify(params));
   }, [params]);
 
-  const [colaboradores, setColaboradores] = useState<Colaborador[]>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('escala_colaboradores_auto');
-      if (saved) {
-        try { return JSON.parse(saved); } catch {}
-      }
-    }
-    return [];
-  });
+  const [colaboradores, setColaboradores] = useState<Colaborador[]>([]);
 
   const [activeTab, setActiveTab] = useState<'painel' | 'planejador'>('planejador');
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [activeScenarioName, setActiveScenarioName] = useState<string | undefined>(undefined);
+  const [activeScenarioId, setActiveScenarioId] = useState<number | undefined>(undefined);
+  const [isScenarioDirty, setIsScenarioDirty] = useState(false);
+  // Ref to skip marking dirty on the very first render after loading a scenario
+  const scenarioJustLoadedRef = useRef(false);
 
-  const [teams, setTeams] = useState<TeamConfig[]>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('escala_teams_config');
-      if (saved) {
-        try { return JSON.parse(saved); } catch {}
-      }
-    }
-    return [];
-  });
-
-  useEffect(() => {
-    localStorage.setItem('escala_teams_config', JSON.stringify(teams));
-  }, [teams]);
+  const [teams, setTeams] = useState<TeamConfig[]>([]);
 
   // Auto-save colaboradores whenever they change in manual mode
   useEffect(() => {
@@ -98,7 +87,8 @@ function App() {
 
   const [demandaDiariaM3, setDemandaDiariaM3] = useState<{ [key: string]: number[] }>(() => {
     if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('demandaDiaria_m3') || localStorage.getItem('demandaDiaria');
+      const monthKey = `demandaDiaria_m3_${params.month}_${params.year}`;
+      const saved = localStorage.getItem(monthKey) || localStorage.getItem('demandaDiaria_m3') || localStorage.getItem('demandaDiaria');
       if (saved) {
         try { return JSON.parse(saved); } catch {}
       }
@@ -108,7 +98,8 @@ function App() {
 
   const [demandaDiariaPcs, setDemandaDiariaPcs] = useState<{ [key: string]: number[] }>(() => {
     if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('demandaDiaria_pcs');
+      const monthKey = `demandaDiaria_pcs_${params.month}_${params.year}`;
+      const saved = localStorage.getItem(monthKey) || localStorage.getItem('demandaDiaria_pcs');
       if (saved) {
         try { return JSON.parse(saved); } catch {}
       }
@@ -179,10 +170,6 @@ function App() {
     // Detect month/year change and persist/load colaboradores in the SAME render
     if (isInitialLoadDone && resolved.month !== undefined && resolved.month >= 0 &&
         (resolved.month !== params.month || resolved.year !== params.year)) {
-      const targetDias = (resolved.year !== undefined)
-        ? new Date(resolved.year, resolved.month + 1, 0).getDate()
-        : resolved.dias ?? 30;
-
       const mesesData = { ...(params.meses_data ?? {}) } as Record<string, Colaborador[]>;
       const currentKey = `${params.month}_${params.year}`;
       const targetKey = `${resolved.month}_${resolved.year}`;
@@ -191,34 +178,38 @@ function App() {
         mesesData[currentKey] = colaboradores;
       }
 
-      const targetColabs = mesesData[targetKey];
-      let newColabs: Colaborador[];
+      // Save current month's demand to month-specific key
+      localStorage.setItem(`demandaDiaria_m3_${currentKey}`, JSON.stringify(demandaDiariaM3));
+      localStorage.setItem(`demandaDiaria_pcs_${currentKey}`, JSON.stringify(demandaDiariaPcs));
 
-      if (targetColabs) {
-        newColabs = targetColabs;
-        setColaboradores(newColabs);
-        setIsManualMode(true);
-      } else if (teams.length > 0) {
-        const scale = generateSchedule({ ...resolved, dias: targetDias }).map(c => ({
-          ...c,
-          team: undefined,
-          escala: Array(targetDias).fill('WORK' as DayStatus),
-        }));
-        const startDay = (new Date(resolved.year!, resolved.month!, 1).getDay() + 6) % 7;
-        const applied = applyTeamsToColaboradores(scale, teams, startDay, targetDias);
-        newColabs = applied.filter(c => c.team !== undefined);
-        setColaboradores(newColabs);
-        setIsManualMode(true);
-      } else {
-        newColabs = [];
-        setColaboradores(newColabs);
-        setIsManualMode(false);
-      }
+      // Load target month's demand
+      const targetM3 = localStorage.getItem(`demandaDiaria_m3_${targetKey}`);
+      const targetM3Parsed = targetM3
+        ? JSON.parse(targetM3)
+        : { T1: Array(28).fill(0), T2: Array(28).fill(0), T3: Array(28).fill(0) };
+      const targetPcs = localStorage.getItem(`demandaDiaria_pcs_${targetKey}`);
+      const targetPcsParsed = targetPcs
+        ? JSON.parse(targetPcs)
+        : { T1: Array(28).fill(0), T2: Array(28).fill(0), T3: Array(28).fill(0) };
+      setDemandaDiariaM3(targetM3Parsed);
+      setDemandaDiariaPcs(targetPcsParsed);
+
+      // Clear schedule data — meses ficam vazios até aplicar um cenário
+      setColaboradores([]);
+      setTeams([]);
+      setIsManualMode(true);
+      // Changing months exits the loaded scenario context
+      setActiveScenarioName(undefined);
+      setActiveScenarioId(undefined);
+      setIsScenarioDirty(false);
+      scenarioJustLoadedRef.current = false;
+      const newColabs: Colaborador[] = [];
 
       const updatedParams = { ...resolved, meses_data: { ...mesesData, [targetKey]: newColabs } };
       setParams(updatedParams);
-      saveToDatabase(newColabs, teams, updatedParams, demandaDiariaM3, demandaDiariaPcs);
+      saveToDatabase(newColabs, [], updatedParams, targetM3Parsed, targetPcsParsed);
       localStorage.setItem(`escala_saved_${currentKey}`, JSON.stringify(mesesData[currentKey] ?? []));
+      localStorage.setItem('escala_teams_config', JSON.stringify([]));
       return;
     }
 
@@ -247,102 +238,22 @@ function App() {
       try {
         const data = await fetchConfig();
         if (data && data.id) {
-          let loadedColabs: Colaborador[] = [];
-          let loadedTeams: TeamConfig[] = [];
-
-          if (data.teams && Array.isArray(data.teams)) {
-            loadedTeams = data.teams;
-            setTeams(loadedTeams);
-            localStorage.setItem('escala_teams_config', JSON.stringify(loadedTeams));
-          }
-
-          if (data.colaboradores && Array.isArray(data.colaboradores)) {
-            loadedColabs = data.colaboradores;
-
-            if (loadedColabs.length > 0) {
-              const hasTeamData = loadedColabs.some(c => c.team !== undefined && c.team !== null);
-              const hasEscalaData = loadedColabs.some(c => c.escala && c.escala.some(d => d !== 'WORK'));
-
-              if (!hasTeamData && !hasEscalaData && loadedTeams.length > 0 && data.params) {
-                console.warn("DB tem dados zerados — reaplicando equipes automaticamente...");
-                const sDay = (data.params.month !== undefined && data.params.year !== undefined)
-                  ? (new Date(data.params.year, data.params.month, 1).getDay() + 6) % 7
-                  : 0;
-                const dias = (data.params.month !== undefined && data.params.year !== undefined)
-                  ? new Date(data.params.year, data.params.month + 1, 0).getDate()
-                  : (data.params.dias ?? 28);
-
-                const recovered = [...loadedColabs];
-                const shifts = ['T1', 'T2', 'T3'] as const;
-                for (const shift of shifts) {
-                  const shiftColabs = recovered.filter(c => c.turno === shift);
-                  const shiftTeams = loadedTeams.filter(t => t.shiftType === shift);
-                  let cursor = 0;
-                  for (const team of shiftTeams) {
-                    for (let i = 0; i < team.memberCount && cursor < shiftColabs.length; i++) {
-                      const colab = shiftColabs[cursor];
-                      const pat = team.offPattern;
-                      const escala = Array.from({ length: dias }, (_, d) => {
-                        const dw = (sDay + d) % 7;
-                        if (Array.isArray(pat)) return (dw === pat[0] || dw === pat[1]) ? 'OFF' : 'WORK';
-                        const isOff = pat === 4 ? (dw === 4 || dw === 5) : pat === 5 ? (dw === 5 || dw === 6) : (dw === 6 || dw === 0);
-                        return isOff ? 'OFF' : 'WORK';
-                      }) as DayStatus[];
-                      const idx = recovered.findIndex(c => c.id === colab.id);
-                      if (idx !== -1) recovered[idx] = { ...recovered[idx], team: team.name, escala };
-                      cursor++;
-                    }
-                  }
-                }
-                loadedColabs = recovered;
-                try {
-                  const mesesData = { ...((data.params as any).meses_data ?? {}) } as Record<string, Colaborador[]>;
-                  const currentKey = `${data.params.month}_${data.params.year}`;
-                  if (recovered.length > 0) {
-                    mesesData[currentKey] = recovered;
-                  }
-                  await saveConfig({
-                    colaboradores: recovered,
-                    teams: loadedTeams,
-                    params: { ...data.params, meses_data: mesesData },
-                    demanda_m3: data.demanda_m3,
-                    demanda_pcs: data.demanda_pcs,
-                  });
-                  console.log("Estado recuperado e salvo no banco com sucesso.");
-                } catch (saveErr) {
-                  console.error("Erro ao salvar estado recuperado:", saveErr);
-                }
-              }
-            }
-
-            setColaboradores(loadedColabs.filter(c => c.team));
-            localStorage.setItem('escala_colaboradores_auto', JSON.stringify(loadedColabs.filter(c => c.team)));
-            setIsManualMode(true);
-          }
-
           if (data.params && typeof data.params === 'object' && Object.keys(data.params).length > 0) {
-            setParams(data.params);
-            localStorage.setItem('scheduleParams', JSON.stringify(data.params));
-            const mesesData = (data.params as any).meses_data as Record<string, Colaborador[]> | undefined;
-            if (mesesData) {
-              for (const [key, colabs] of Object.entries(mesesData)) {
-                localStorage.setItem(`escala_saved_${key}`, JSON.stringify(colabs));
-              }
-              const viewKey = `${data.params.month}_${data.params.year}`;
-              if (mesesData[viewKey] && (!data.colaboradores || !Array.isArray(data.colaboradores) || data.colaboradores.length === 0)) {
-                const filtered = mesesData[viewKey].filter((c: Colaborador) => c.team);
-                setColaboradores(filtered);
-                localStorage.setItem('escala_colaboradores_auto', JSON.stringify(filtered));
-                setIsManualMode(true);
-              }
-            }
+            const cleanParams = { ...data.params };
+            delete cleanParams.meses_data;
+            setParams(cleanParams);
+            localStorage.setItem('scheduleParams', JSON.stringify(cleanParams));
           }
           if (data.demanda_m3) {
+            const m3MonthKey = `${data.params?.month ?? params.month}_${data.params?.year ?? params.year}`;
             setDemandaDiariaM3(data.demanda_m3);
+            localStorage.setItem(`demandaDiaria_m3_${m3MonthKey}`, JSON.stringify(data.demanda_m3));
             localStorage.setItem('demandaDiaria_m3', JSON.stringify(data.demanda_m3));
           }
           if (data.demanda_pcs) {
+            const pcsMonthKey = `${data.params?.month ?? params.month}_${data.params?.year ?? params.year}`;
             setDemandaDiariaPcs(data.demanda_pcs);
+            localStorage.setItem(`demandaDiaria_pcs_${pcsMonthKey}`, JSON.stringify(data.demanda_pcs));
             localStorage.setItem('demandaDiaria_pcs', JSON.stringify(data.demanda_pcs));
           }
         }
@@ -404,8 +315,6 @@ function App() {
     demM3: typeof demandaDiariaM3,
     demPcs: typeof demandaDiariaPcs
   ) => {
-    setSyncStatus('saving');
-
     // Build meses_data from in-memory params.meses_data + current colaboradores
     const mesesData = { ...((pms as any).meses_data ?? {}) } as Record<string, Colaborador[]>;
     const currentKey = `${pms.month}_${pms.year}`;
@@ -426,6 +335,67 @@ function App() {
     } catch (err) {
       console.error("Erro ao salvar no banco:", err);
     }
+  };
+
+  const handleLoadScenario = (data: { teams?: any; params?: any; demanda_m3?: any; demanda_pcs?: any; scenarioName?: string; scenarioId?: number }) => {
+    if (data.scenarioName) {
+      setActiveScenarioName(data.scenarioName);
+    }
+    if (data.scenarioId !== undefined) {
+      setActiveScenarioId(data.scenarioId);
+    }
+    // Mark that a scenario was just loaded so we don't immediately flag it as dirty
+    scenarioJustLoadedRef.current = true;
+    setIsScenarioDirty(false);
+    if ('teams' in data) {
+      const newTeams = data.teams ?? [];
+      setTeams(newTeams);
+      localStorage.setItem('escala_teams_config', JSON.stringify(newTeams));
+    }
+    if (data.params) {
+      // Keep current month/year — scenario applies to the month the user is viewing
+      const currentMonth = params.month;
+      const currentYear = params.year;
+      const mergedParams = { ...data.params, month: currentMonth, year: currentYear };
+      // Merge meses_data from scenario so we can look up the current month
+      const mergedMesesData = { ...((data.params as any).meses_data ?? {}), ...((params as any).meses_data ?? {}) };
+      mergedParams.meses_data = mergedMesesData;
+      setParams(mergedParams);
+      localStorage.setItem('scheduleParams', JSON.stringify(mergedParams));
+      // Sync meses_data from loaded params to localStorage
+      const mesesData = mergedMesesData as Record<string, Colaborador[]>;
+      for (const [key, colabs] of Object.entries(mesesData)) {
+        localStorage.setItem(`escala_saved_${key}`, JSON.stringify(colabs));
+      }
+      const viewKey = `${currentMonth}_${currentYear}`;
+      if (mesesData[viewKey] && mesesData[viewKey].length > 0) {
+        const filtered = mesesData[viewKey].filter((c: Colaborador) => c.team);
+        setColaboradores(filtered);
+        localStorage.setItem('escala_colaboradores_auto', JSON.stringify(filtered));
+        setIsManualMode(true);
+      } else {
+        // Fallback: generate colaboradores from teams and params for the CURRENT month
+        const startDay = (currentMonth !== undefined && currentYear !== undefined)
+          ? (new Date(currentYear!, currentMonth!, 1).getDay() + 6) % 7
+          : 0;
+        const dias = (currentMonth !== undefined && currentYear !== undefined)
+          ? new Date(currentYear!, currentMonth! + 1, 0).getDate()
+          : data.params.dias;
+        if (data.teams && data.teams.length > 0) {
+          const scale = generateSchedule(data.params).map(c => ({
+            ...c,
+            team: undefined,
+            escala: Array(dias).fill('WORK' as DayStatus),
+          }));
+          const applied = applyTeamsToColaboradores(scale, data.teams, startDay, dias);
+          const kept = applied.filter(c => c.team !== undefined);
+          setColaboradores(kept);
+          localStorage.setItem('escala_colaboradores_auto', JSON.stringify(kept));
+          setIsManualMode(true);
+        }
+      }
+    }
+    saveToDatabase(colaboradores, data.teams ?? teams, data.params ?? params, demandaDiariaM3, demandaDiariaPcs);
   };
 
   const handleUpdateTeams = (newTeams: TeamConfig[]) => {
@@ -525,12 +495,7 @@ function App() {
     }
   };
 
-  const [isManualMode, setIsManualMode] = useState<boolean>(() => {
-    if (typeof window !== 'undefined') {
-      return !!localStorage.getItem('escala_colaboradores_auto');
-    }
-    return false;
-  });
+  const [isManualMode, setIsManualMode] = useState<boolean>(true);
 
 
   // Toggle Dark Mode
@@ -574,6 +539,11 @@ function App() {
 
   // Run on initial mount or parameters change (only if not in manual mode)
   useEffect(() => {
+    // Skip recalculation if DB just loaded valid data — avoids overwriting DB state
+    if (dbLoadedRef.current) {
+      dbLoadedRef.current = false;
+      return;
+    }
     if (isInitialLoadDone && !isManualMode) {
       handleRecalculate();
     }
@@ -584,6 +554,18 @@ function App() {
     params.setor, params.weeks,
     isManualMode, isInitialLoadDone
   ]);
+
+  // Detect changes made after a scenario was loaded → mark as dirty
+  useEffect(() => {
+    if (!activeScenarioName) return; // No active scenario, nothing to track
+    if (scenarioJustLoadedRef.current) {
+      // Skip the first fire right after loading — it's not a user edit
+      scenarioJustLoadedRef.current = false;
+      return;
+    }
+    setIsScenarioDirty(true);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [teams, colaboradores]);
 
   // Synchronize headcount parameters with the collaborators list (even in manual mode)
   useEffect(() => {
@@ -862,7 +844,7 @@ function App() {
                   <Calendar className="w-6 h-6 text-blue-600" />
                   <div>
                     <h3 className="text-base font-black text-slate-800 dark:text-slate-100">
-                      Calendário de Planejamento & Parâmetros (28 Dias)
+                      Calendário de Planejamento & Parâmetros ({diasNum} Dias)
                     </h3>
                     <p className="text-[11px] text-slate-400">Ajuste as metas de Hc, regras da CLT e veja o impacto imediatamente na escala</p>
                   </div>
@@ -906,6 +888,11 @@ function App() {
                 demandaDiariaPcsProp={demandaDiariaPcs}
                 onDemandaChangeM3={handleDemandaM3Change}
                 onDemandaChangePcs={handleDemandaPcsChange}
+                onLoadScenario={handleLoadScenario}
+                activeScenarioName={activeScenarioName}
+                activeScenarioId={activeScenarioId}
+                isScenarioDirty={isScenarioDirty}
+                onScenarioSaved={() => setIsScenarioDirty(false)}
               />
             </section>
           </>

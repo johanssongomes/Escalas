@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import type { Colaborador, ScheduleParams, TeamConfig } from '../../types';
 import { Calendar, User, Filter, Layers, ChevronDown, ChevronRight, ChevronsUpDown, Settings2, Calculator, CheckCircle2, TrendingDown } from 'lucide-react';
 import { TeamManagerModal } from './TeamManagerModal';
+import { ScenarioManager } from './ScenarioManager';
 
 interface CalendarGridProps {
   colaboradores: Colaborador[];
@@ -19,6 +20,11 @@ interface CalendarGridProps {
   demandaDiariaPcsProp?: { [key: string]: number[] };
   onDemandaChangeM3?: (val: { [key: string]: number[] }) => void;
   onDemandaChangePcs?: (val: { [key: string]: number[] }) => void;
+  onLoadScenario?: (data: { teams?: any; params?: any; demanda_m3?: any; demanda_pcs?: any; scenarioName?: string; scenarioId?: number }) => void;
+  activeScenarioName?: string;
+  activeScenarioId?: number;
+  isScenarioDirty?: boolean;
+  onScenarioSaved?: () => void;
 }
 
 const WEEKDAYS = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'];
@@ -61,6 +67,11 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
   demandaDiariaPcsProp,
   onDemandaChangeM3,
   onDemandaChangePcs,
+  onLoadScenario,
+  activeScenarioName,
+  activeScenarioId,
+  isScenarioDirty,
+  onScenarioSaved,
 }) => {
   const startDayOfWeek = (month !== undefined && year !== undefined)
     ? (new Date(year, month, 1).getDay() + 6) % 7
@@ -89,9 +100,11 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
   const prodRate = prodUnit === 'm3' ? prodRateM3 : prodRatePcs;
   // Team manager modal
   const [showTeamManager, setShowTeamManager] = useState(false);
+  const monthKey = params ? `${params.month}_${params.year}` : '';
+
   // Daily demand store per shift (indexed T1, T2, T3) for m3
   const [demandaDiariaM3, setDemandaDiariaM3] = useState<{ [key: string]: number[] }>(() => {
-    const saved = localStorage.getItem('demandaDiaria_m3') || localStorage.getItem('demandaDiaria');
+    const saved = localStorage.getItem(`demandaDiaria_m3_${monthKey}`) || localStorage.getItem('demandaDiaria_m3') || localStorage.getItem('demandaDiaria');
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
@@ -112,7 +125,7 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
 
   // Daily demand store per shift (indexed T1, T2, T3) for pcs
   const [demandaDiariaPcs, setDemandaDiariaPcs] = useState<{ [key: string]: number[] }>(() => {
-    const saved = localStorage.getItem('demandaDiaria_pcs');
+    const saved = localStorage.getItem(`demandaDiaria_pcs_${monthKey}`) || localStorage.getItem('demandaDiaria_pcs');
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
@@ -205,14 +218,14 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
       if (!newDemanda[shift]) newDemanda[shift] = Array(diasCount).fill(0);
       newDemanda[shift][dayIdx] = val;
       setDemandaDiariaM3(newDemanda);
-      localStorage.setItem('demandaDiaria_m3', JSON.stringify(newDemanda));
+      localStorage.setItem(`demandaDiaria_m3_${monthKey}`, JSON.stringify(newDemanda));
       if (onDemandaChangeM3) onDemandaChangeM3(newDemanda);
     } else {
       const newDemanda = { ...demandaDiariaPcs };
       if (!newDemanda[shift]) newDemanda[shift] = Array(diasCount).fill(0);
       newDemanda[shift][dayIdx] = val;
       setDemandaDiariaPcs(newDemanda);
-      localStorage.setItem('demandaDiaria_pcs', JSON.stringify(newDemanda));
+      localStorage.setItem(`demandaDiaria_pcs_${monthKey}`, JSON.stringify(newDemanda));
       if (onDemandaChangePcs) onDemandaChangePcs(newDemanda);
     }
   };
@@ -397,7 +410,7 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
             <Calendar className="w-5 h-5 text-slate-600" />
             <div>
               <h2 className="text-base font-black text-slate-800 dark:text-slate-100">
-                Calendário de Planejamento (28 Dias)
+                Calendário de Planejamento ({diasCount} Dias)
               </h2>
               <p className="text-[10px] text-slate-400">Escala de folgas e turnos da equipe</p>
             </div>
@@ -485,6 +498,17 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
               <Settings2 className="w-4 h-4" />
               Gerenciar Equipes
             </button>
+
+            <ScenarioManager
+              teams={teams}
+              params={params}
+              colaboradores={colaboradores}
+              activeScenarioName={activeScenarioName}
+              activeScenarioId={activeScenarioId}
+              isScenarioDirty={isScenarioDirty}
+              onScenarioSaved={onScenarioSaved}
+              onLoadScenario={(data) => onLoadScenario?.(data)}
+            />
           </div>
 
           {/* Row 2: Filtering and Legend */}

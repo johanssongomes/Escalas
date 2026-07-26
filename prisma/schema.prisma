@@ -16,3 +16,13 @@ model EscalaConfig {
   demanda_pcs  Json?
   updated_at   DateTime @default(now()) @db.Timestamptz
 }
+
+model Scenario {
+  id         Int      @id @default(autoincrement())
+  name       String
+  teams      Json?
+  params     Json?
+  demanda_m3 Json?
+  demanda_pcs Json?
+  created_at DateTime @default(now()) @db.Timestamptz
+}
