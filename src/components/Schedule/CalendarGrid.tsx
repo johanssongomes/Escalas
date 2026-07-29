@@ -20,7 +20,15 @@ interface CalendarGridProps {
   demandaDiariaPcsProp?: { [key: string]: number[] };
   onDemandaChangeM3?: (val: { [key: string]: number[] }) => void;
   onDemandaChangePcs?: (val: { [key: string]: number[] }) => void;
-  onLoadScenario?: (data: { teams?: any; params?: any; demanda_m3?: any; demanda_pcs?: any; scenarioName?: string; scenarioId?: number }) => void;
+  pmtM3Prop?: number[];
+  pmtPcsProp?: number[];
+  onPmtM3Change?: (val: number[]) => void;
+  onPmtPcsChange?: (val: number[]) => void;
+  prodRateM3Prop?: number;
+  prodRatePcsProp?: number;
+  prodUnitProp?: 'm3' | 'pcs';
+  onProdRateChange?: (rateM3: number, ratePcs: number, unit: 'm3' | 'pcs') => void;
+  onLoadScenario?: (data: { teams?: any; params?: any; demanda_m3?: any; demanda_pcs?: any; pmt_m3?: any; pmt_pcs?: any; prod_rate_m3?: number; prod_rate_pcs?: number; prod_unit?: string; scenarioName?: string; scenarioId?: number }) => void;
   activeScenarioName?: string;
   activeScenarioId?: number;
   isScenarioDirty?: boolean;
@@ -67,6 +75,14 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
   demandaDiariaPcsProp,
   onDemandaChangeM3,
   onDemandaChangePcs,
+  pmtM3Prop,
+  pmtPcsProp,
+  onPmtM3Change,
+  onPmtPcsChange,
+  prodRateM3Prop,
+  prodRatePcsProp,
+  prodUnitProp,
+  onProdRateChange,
   onLoadScenario,
   activeScenarioName,
   activeScenarioId,
@@ -94,55 +110,69 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
   };
 
   // Productivity rate (m³ or Pçs per collaborator per day)
-  const [prodRateM3, setProdRateM3] = useState<number>(25);
-  const [prodRatePcs, setProdRatePcs] = useState<number>(250);
-  const [prodUnit, setProdUnit] = useState<'m3' | 'pcs'>('m3');
+  const [prodRateM3, setProdRateM3] = useState<number>(prodRateM3Prop ?? 25);
+  const [prodRatePcs, setProdRatePcs] = useState<number>(prodRatePcsProp ?? 250);
+  const [prodUnit, setProdUnit] = useState<'m3' | 'pcs'>(prodUnitProp ?? 'm3');
   const prodRate = prodUnit === 'm3' ? prodRateM3 : prodRatePcs;
+
+  // Sync prod rate from DB props
+  useEffect(() => {
+    if (prodRateM3Prop != null) setProdRateM3(prodRateM3Prop);
+  }, [prodRateM3Prop]);
+  useEffect(() => {
+    if (prodRatePcsProp != null) setProdRatePcs(prodRatePcsProp);
+  }, [prodRatePcsProp]);
+  useEffect(() => {
+    if (prodUnitProp != null) setProdUnit(prodUnitProp);
+  }, [prodUnitProp]);
+
+  const updateProdRateM3 = (val: number) => {
+    setProdRateM3(val);
+    onProdRateChange?.(val, prodRatePcs, prodUnit);
+  };
+  const updateProdRatePcs = (val: number) => {
+    setProdRatePcs(val);
+    onProdRateChange?.(prodRateM3, val, prodUnit);
+  };
+  const updateProdUnit = (val: 'm3' | 'pcs') => {
+    setProdUnit(val);
+    onProdRateChange?.(prodRateM3, prodRatePcs, val);
+  };
+
+  // PMT data (editable per-day values) — separate for m3 and pcs
+  const [pmtDataM3, setPmtDataM3] = useState<number[]>(() => Array(diasCount).fill(0));
+  const [pmtDataPcs, setPmtDataPcs] = useState<number[]>(() => Array(diasCount).fill(0));
+
+  const pmtData = prodUnit === 'm3'
+    ? (pmtDataM3.length >= diasCount ? pmtDataM3 : Array(diasCount).fill(0))
+    : (pmtDataPcs.length >= diasCount ? pmtDataPcs : Array(diasCount).fill(0));
+
+  useEffect(() => {
+    if (pmtM3Prop !== undefined) {
+      setPmtDataM3(pmtM3Prop.length >= diasCount ? pmtM3Prop : Array(diasCount).fill(0));
+    }
+  }, [pmtM3Prop, diasCount]);
+  useEffect(() => {
+    if (pmtPcsProp !== undefined) {
+      setPmtDataPcs(pmtPcsProp.length >= diasCount ? pmtPcsProp : Array(diasCount).fill(0));
+    }
+  }, [pmtPcsProp, diasCount]);
+
+  const updatePmtM3Data = (val: number[]) => {
+    setPmtDataM3(val);
+    onPmtM3Change?.(val);
+  };
+  const updatePmtPcsData = (val: number[]) => {
+    setPmtDataPcs(val);
+    onPmtPcsChange?.(val);
+  };
   // Team manager modal
   const [showTeamManager, setShowTeamManager] = useState(false);
-  const monthKey = params ? `${params.month}_${params.year}` : '';
 
   // Daily demand store per shift (indexed T1, T2, T3) for m3
-  const [demandaDiariaM3, setDemandaDiariaM3] = useState<{ [key: string]: number[] }>(() => {
-    const saved = localStorage.getItem(`demandaDiaria_m3_${monthKey}`) || localStorage.getItem('demandaDiaria_m3') || localStorage.getItem('demandaDiaria');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        ['T1', 'T2', 'T3'].forEach(s => {
-          if (!Array.isArray(parsed[s]) || parsed[s].length !== 28) {
-            parsed[s] = Array(28).fill(0);
-          }
-        });
-        return parsed;
-      } catch (e) {}
-    }
-    return {
-      T1: Array(28).fill(0),
-      T2: Array(28).fill(0),
-      T3: Array(28).fill(0)
-    };
-  });
-
+  const [demandaDiariaM3, setDemandaDiariaM3] = useState<{ [key: string]: number[] }>({ T1: Array(28).fill(0), T2: Array(28).fill(0), T3: Array(28).fill(0) });
   // Daily demand store per shift (indexed T1, T2, T3) for pcs
-  const [demandaDiariaPcs, setDemandaDiariaPcs] = useState<{ [key: string]: number[] }>(() => {
-    const saved = localStorage.getItem(`demandaDiaria_pcs_${monthKey}`) || localStorage.getItem('demandaDiaria_pcs');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        ['T1', 'T2', 'T3'].forEach(s => {
-          if (!Array.isArray(parsed[s]) || parsed[s].length !== 28) {
-            parsed[s] = Array(28).fill(0);
-          }
-        });
-        return parsed;
-      } catch (e) {}
-    }
-    return {
-      T1: Array(28).fill(0),
-      T2: Array(28).fill(0),
-      T3: Array(28).fill(0)
-    };
-  });
+  const [demandaDiariaPcs, setDemandaDiariaPcs] = useState<{ [key: string]: number[] }>({ T1: Array(28).fill(0), T2: Array(28).fill(0), T3: Array(28).fill(0) });
 
   useEffect(() => {
     if (demandaDiariaM3Prop) {
@@ -218,14 +248,12 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
       if (!newDemanda[shift]) newDemanda[shift] = Array(diasCount).fill(0);
       newDemanda[shift][dayIdx] = val;
       setDemandaDiariaM3(newDemanda);
-      localStorage.setItem(`demandaDiaria_m3_${monthKey}`, JSON.stringify(newDemanda));
       if (onDemandaChangeM3) onDemandaChangeM3(newDemanda);
     } else {
       const newDemanda = { ...demandaDiariaPcs };
       if (!newDemanda[shift]) newDemanda[shift] = Array(diasCount).fill(0);
       newDemanda[shift][dayIdx] = val;
       setDemandaDiariaPcs(newDemanda);
-      localStorage.setItem(`demandaDiaria_pcs_${monthKey}`, JSON.stringify(newDemanda));
       if (onDemandaChangePcs) onDemandaChangePcs(newDemanda);
     }
   };
@@ -503,6 +531,13 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
               teams={teams}
               params={params}
               colaboradores={colaboradores}
+              demanda_m3={demandaDiariaM3Prop}
+              demanda_pcs={demandaDiariaPcsProp}
+              pmt_m3={pmtDataM3}
+              pmt_pcs={pmtDataPcs}
+              prod_rate_m3={prodRateM3}
+              prod_rate_pcs={prodRatePcs}
+              prod_unit={prodUnit}
               activeScenarioName={activeScenarioName}
               activeScenarioId={activeScenarioId}
               isScenarioDirty={isScenarioDirty}
@@ -576,7 +611,7 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
               {/* Unit Toggle */}
               <div className="flex bg-slate-100 dark:bg-slate-850 p-0.5 rounded-lg border border-slate-200/50 dark:border-slate-800 shrink-0">
                 <button
-                  onClick={() => setProdUnit('m3')}
+                  onClick={() => updateProdUnit('m3')}
                   className={`px-2 py-0.5 rounded-md text-[9px] font-black transition cursor-pointer ${
                     prodUnit === 'm3'
                       ? 'bg-blue-600 text-white shadow-sm'
@@ -586,7 +621,7 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
                   m³
                 </button>
                 <button
-                  onClick={() => setProdUnit('pcs')}
+                  onClick={() => updateProdUnit('pcs')}
                   className={`px-2 py-0.5 rounded-md text-[9px] font-black transition cursor-pointer ${
                     prodUnit === 'pcs'
                       ? 'bg-blue-600 text-white shadow-sm'
@@ -608,9 +643,9 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
               onChange={(e) => {
                 const val = Math.max(1, parseInt(e.target.value) || 0);
                 if (prodUnit === 'm3') {
-                  setProdRateM3(val);
+                  updateProdRateM3(val);
                 } else {
-                  setProdRatePcs(val);
+                  updateProdRatePcs(val);
                 }
               }}
               className="w-20 text-lg font-black text-slate-800 dark:text-slate-100 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-2 py-1.5 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 text-center"
@@ -621,17 +656,17 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
           </div>
         </div>
 
-        {/* Card 2: Capacidade Teórica */}
+        {/* Card 2: PMT */}
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-4 shadow-sm flex flex-col justify-between">
           <div>
-            <h5 className="text-[9px] font-black text-slate-450 dark:text-slate-555 uppercase tracking-wider">Capacidade Teórica</h5>
+            <h5 className="text-[9px] font-black text-slate-450 dark:text-slate-555 uppercase tracking-wider">PMT</h5>
             <div className="flex items-baseline gap-1 mt-3">
-              <span className="text-3xl font-black text-slate-800 dark:text-slate-100">{capacityStats.capacidadeTeorica.toLocaleString('pt-BR')}</span>
+              <span className="text-3xl font-black text-slate-800 dark:text-slate-100">{pmtData.reduce((a, b) => a + b, 0).toLocaleString('pt-BR')}</span>
               <span className="text-xs font-bold text-slate-400">{prodUnit === 'm3' ? 'm³' : 'Pçs'}</span>
             </div>
           </div>
           <p className="text-[10px] text-slate-400 mt-4">
-            Sem considerar folgas da escala
+            Total mensal — dados inseridos manualmente na linha PMT
           </p>
         </div>
 
@@ -1187,24 +1222,25 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
                   </td>
                   {Array.from({ length: diasCount }).map((_, d) => {
                     const count = colaboradores.filter(c => selectedShifts.includes(c.turno) && c.escala[d] === 'WORK').length;
+                    const cap = count * prodRate;
                     const isSun = d % 7 === 6;
                     return (
                       <td
                         key={d}
-                        className={`p-0.5 text-center text-[9px] font-black text-slate-700 dark:text-slate-300 ${
+                        className={`p-0.5 text-center text-[9px] font-black text-blue-600 dark:text-blue-400 ${
                           isSun 
                             ? 'border-r-2 border-slate-300 dark:border-slate-700' 
                             : 'border-r border-slate-200 dark:border-slate-800'
                         }`}
                       >
-                        {count * prodRate}
+                        {cap.toLocaleString('pt-BR')}
                       </td>
                     );
                   })}
                   {/* Summary Cell */}
                   <td className="p-0.5 text-center text-[9px] font-bold bg-slate-50/40 dark:bg-slate-900/20 border-l border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300">
                     <div className="flex flex-col items-center">
-                      <span>{(Array.from({ length: diasCount }).map((_, d) => colaboradores.filter(c => selectedShifts.includes(c.turno) && c.escala[d] === 'WORK').length * prodRate).reduce((a, b) => a + b, 0)).toLocaleString('pt-BR')}</span>
+                      <span>{Array.from({ length: diasCount }).map((_, d) => colaboradores.filter(c => selectedShifts.includes(c.turno) && c.escala[d] === 'WORK').length * prodRate).reduce((a, b) => a + b, 0).toLocaleString('pt-BR')}</span>
                       <span className="text-[6.5px] text-slate-400 font-normal">TT</span>
                     </div>
                   </td>
@@ -1339,6 +1375,44 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
                           </>
                         );
                       })()}
+                    </div>
+                  </td>
+                </tr>
+                {/* PMT Row */}
+                <tr className="hover:bg-slate-50/50 transition">
+                  <td className="p-1 sticky left-0 z-20 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 font-bold text-[9px] shadow-sm text-violet-700 dark:text-violet-400">
+                    PMT
+                  </td>
+                  {Array.from({ length: diasCount }).map((_, d) => {
+                    const isSun = d % 7 === 6;
+                    return (
+                      <td
+                        key={d}
+                        className={`p-0 text-center ${isSun ? 'border-r-2 border-slate-300 dark:border-slate-700' : 'border-r border-slate-200 dark:border-slate-800'}`}
+                      >
+                        <input
+                          type="number"
+                          value={pmtData[d]}
+                          onChange={e => {
+                            const val = e.target.value === '' ? 0 : Number(e.target.value);
+                            const next = [...pmtData];
+                            next[d] = val;
+                            if (prodUnit === 'm3') {
+                              updatePmtM3Data(next);
+                            } else {
+                              updatePmtPcsData(next);
+                            }
+                          }}
+                          className="w-full h-full bg-transparent text-center text-[9px] font-black text-slate-700 dark:text-slate-300 outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none focus:bg-violet-50 dark:focus:bg-violet-900/20"
+                        />
+                      </td>
+                    );
+                  })}
+                  {/* Summary Cell */}
+                  <td className="p-0.5 text-center text-[9px] font-bold bg-slate-50/40 dark:bg-slate-900/20 border-l border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300">
+                    <div className="flex flex-col items-center">
+                      <span>{pmtData.reduce((a, b) => a + b, 0).toLocaleString('pt-BR')}</span>
+                      <span className="text-[6.5px] text-slate-400 font-normal">TT</span>
                     </div>
                   </td>
                 </tr>

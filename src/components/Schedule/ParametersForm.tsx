@@ -43,14 +43,24 @@ export const ParametersForm: React.FC<ParametersFormProps> = ({
     defaultValues: initialValues,
   });
 
-  // Keep form in sync when parent initialValues change
+  // Keep form in sync when parent initialValues change (scenario load, etc.)
   useEffect(() => {
+    setValue('conferentesT1', initialValues.conferentesT1);
+    setValue('conferentesT2', initialValues.conferentesT2);
+    setValue('conferentesT3', initialValues.conferentesT3);
+    setValue('weeks', initialValues.weeks);
+    setValue('dias', initialValues.dias);
     setValue('horasSemanais', initialValues.horasSemanais);
     setValue('cenario', initialValues.cenario);
     setValue('setor', initialValues.setor);
     if (initialValues.month !== undefined) setValue('month', initialValues.month);
     if (initialValues.year !== undefined) setValue('year', initialValues.year);
-  }, [initialValues.horasSemanais, initialValues.cenario, initialValues.setor, initialValues.month, initialValues.year, setValue]);
+  }, [
+    initialValues.conferentesT1, initialValues.conferentesT2, initialValues.conferentesT3,
+    initialValues.weeks, initialValues.dias,
+    initialValues.horasSemanais, initialValues.cenario, initialValues.setor,
+    initialValues.month, initialValues.year, setValue
+  ]);
 
   // Watch all values to trigger automatic recalculation
   const watchedValues = watch();
@@ -84,7 +94,10 @@ export const ParametersForm: React.FC<ParametersFormProps> = ({
       }
       setPrevMonth(currentMonth);
       setPrevYear(currentYear);
-    } else if (currentWeeks !== prevWeeks) {
+      // Skip onChange – let setValue trigger a new render with corrected dias/weeks
+      return;
+    }
+    if (currentWeeks !== prevWeeks) {
       if (currentWeeks !== undefined) {
         const calculatedDays = currentWeeks * 7;
         setValue('dias', calculatedDays);

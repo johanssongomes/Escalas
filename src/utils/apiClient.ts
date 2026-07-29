@@ -12,6 +12,10 @@ export async function saveConfig(data: {
   params?: any;
   demanda_m3?: any;
   demanda_pcs?: any;
+  pmt?: any;
+  prod_rate_m3?: number;
+  prod_rate_pcs?: number;
+  prod_unit?: string;
 }): Promise<void> {
   const res = await fetch(`${API_BASE}/config`, {
     method: 'PUT',
@@ -40,6 +44,10 @@ export interface ScenarioData {
   params?: any;
   demanda_m3?: any;
   demanda_pcs?: any;
+  pmt?: any;
+  prod_rate_m3?: number;
+  prod_rate_pcs?: number;
+  prod_unit?: string;
   created_at: string;
 }
 
@@ -55,6 +63,10 @@ export async function createScenario(data: {
   params?: any;
   demanda_m3?: any;
   demanda_pcs?: any;
+  pmt?: any;
+  prod_rate_m3?: number;
+  prod_rate_pcs?: number;
+  prod_unit?: string;
 }): Promise<ScenarioData> {
   const res = await fetch(`${API_BASE}/scenarios`, {
     method: 'POST',
@@ -75,6 +87,10 @@ export async function updateScenario(id: number, data: {
   params?: any;
   demanda_m3?: any;
   demanda_pcs?: any;
+  pmt?: any;
+  prod_rate_m3?: number;
+  prod_rate_pcs?: number;
+  prod_unit?: string;
 }): Promise<ScenarioData> {
   const res = await fetch(`${API_BASE}/scenarios/${id}`, {
     method: 'PUT',

@@ -7,16 +7,21 @@ interface Props {
   params?: any;
   demanda_m3?: any;
   demanda_pcs?: any;
+  pmt_m3?: any;
+  pmt_pcs?: any;
+  prod_rate_m3?: number;
+  prod_rate_pcs?: number;
+  prod_unit?: string;
   colaboradores?: any;
   activeScenarioName?: string;
   activeScenarioId?: number;
   isScenarioDirty?: boolean;
-  onLoadScenario: (data: { teams?: any; params?: any; demanda_m3?: any; demanda_pcs?: any; scenarioName?: string; scenarioId?: number }) => void;
-  onScenarioSaved?: () => void; // Called after saving changes to reset dirty state
+  onLoadScenario: (data: { teams?: any; params?: any; demanda_m3?: any; demanda_pcs?: any; pmt_m3?: any; pmt_pcs?: any; prod_rate_m3?: number; prod_rate_pcs?: number; prod_unit?: string; scenarioName?: string; scenarioId?: number }) => void;
+  onScenarioSaved?: () => void;
 }
 
 export function ScenarioManager({
-  teams, params, demanda_m3, demanda_pcs, colaboradores,
+  teams, params, demanda_m3, demanda_pcs, pmt_m3, pmt_pcs, prod_rate_m3, prod_rate_pcs, prod_unit, colaboradores,
   activeScenarioName, activeScenarioId, isScenarioDirty,
   onLoadScenario, onScenarioSaved,
 }: Props) {
@@ -26,12 +31,19 @@ export function ScenarioManager({
   const [scenarioName, setScenarioName] = useState('');
   const [loading, setLoading] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const loadList = async () => {
     try {
       const list = await listScenarios();
       setScenarios(list);
+      setLoadError(null);
     } catch (err) {
+      const msg = err instanceof TypeError && err.message === 'Failed to fetch'
+        ? 'Servidor offline. Não foi possível carregar a lista de cenários.'
+        : `Erro ao carregar lista: ${err instanceof Error ? err.message : 'Erro desconhecido'}`;
+      setLoadError(msg);
       console.error('Erro ao carregar cenários:', err);
     }
   };
@@ -43,6 +55,7 @@ export function ScenarioManager({
   const handleSave = async () => {
     if (!scenarioName.trim()) return;
     setLoading(true);
+    setSaveError(null);
     try {
       const updatedParams = {
         ...params,
@@ -55,10 +68,20 @@ export function ScenarioManager({
         name: scenarioName.trim(),
         teams,
         params: updatedParams,
+        demanda_m3,
+        demanda_pcs,
+        pmt: { m3: pmt_m3, pcs: pmt_pcs },
+        prod_rate_m3,
+        prod_rate_pcs,
+        prod_unit,
       });
       setShowSaveModal(false);
       setScenarioName('');
     } catch (err) {
+      const msg = err instanceof TypeError && err.message === 'Failed to fetch'
+        ? 'Servidor offline. Certifique-se de que o backend está rodando (npm run dev:server).'
+        : `Erro ao salvar: ${err instanceof Error ? err.message : 'Erro desconhecido'}`;
+      setSaveError(msg);
       console.error('Erro ao salvar cenário:', err);
     } finally {
       setLoading(false);
@@ -67,16 +90,31 @@ export function ScenarioManager({
 
   const handleLoad = async (id: number, name: string) => {
     setLoading(true);
+    setLoadError(null);
     try {
       const scenario = await getScenario(id);
+      const pmtData = scenario.pmt;
+      const pmtM3 = Array.isArray(pmtData) ? pmtData : pmtData?.m3;
+      const pmtPcs = !Array.isArray(pmtData) ? pmtData?.pcs : undefined;
       onLoadScenario({
         teams: scenario.teams ?? undefined,
         params: scenario.params ?? undefined,
+        demanda_m3: scenario.demanda_m3 ?? undefined,
+        demanda_pcs: scenario.demanda_pcs ?? undefined,
+        pmt_m3: pmtM3 ?? undefined,
+        pmt_pcs: pmtPcs ?? undefined,
+        prod_rate_m3: scenario.prod_rate_m3 ?? undefined,
+        prod_rate_pcs: scenario.prod_rate_pcs ?? undefined,
+        prod_unit: scenario.prod_unit ?? undefined,
         scenarioName: name,
         scenarioId: id,
       });
       setShowLoadModal(false);
     } catch (err) {
+      const msg = err instanceof TypeError && err.message === 'Failed to fetch'
+        ? 'Servidor offline. Certifique-se de que o backend está rodando (npm run dev:server).'
+        : `Erro ao carregar: ${err instanceof Error ? err.message : 'Erro desconhecido'}`;
+      setLoadError(msg);
       console.error('Erro ao carregar cenário:', err);
     } finally {
       setLoading(false);
@@ -84,12 +122,23 @@ export function ScenarioManager({
   };
 
   const handleDelete = async (id: number) => {
+    setLoadError(null);
     try {
       await deleteScenario(id);
       loadList();
     } catch (err) {
+      const msg = err instanceof TypeError && err.message === 'Failed to fetch'
+        ? 'Servidor offline. Não foi possível excluir.'
+        : `Erro ao excluir: ${err instanceof Error ? err.message : 'Erro desconhecido'}`;
+      setLoadError(msg);
       console.error('Erro ao deletar cenário:', err);
     }
+  };
+
+  // Open the save modal
+  const openSaveModal = () => {
+    setSaveError(null);
+    setShowSaveModal(true);
   };
 
   // Save changes to the currently active scenario
@@ -104,12 +153,17 @@ export function ScenarioManager({
           [`${params?.month}_${params?.year}`]: colaboradores ?? [],
         },
       };
-      await updateScenario(activeScenarioId, { teams, params: updatedParams });
+      await updateScenario(activeScenarioId, { teams, params: updatedParams, demanda_m3, demanda_pcs, pmt: { m3: pmt_m3, pcs: pmt_pcs }, prod_rate_m3, prod_rate_pcs, prod_unit });
       setSaveSuccess(true);
       onScenarioSaved?.();
       setTimeout(() => setSaveSuccess(false), 2500);
     } catch (err) {
+      const msg = err instanceof TypeError && err.message === 'Failed to fetch'
+        ? 'Servidor offline. Certifique-se de que o backend está rodando (npm run dev:server).'
+        : `Erro ao salvar alterações: ${err instanceof Error ? err.message : 'Erro desconhecido'}`;
       console.error('Erro ao atualizar cenário:', err);
+      // Use alert as fallback since this button doesn't have a modal context
+      alert(msg);
     } finally {
       setLoading(false);
     }
@@ -144,7 +198,7 @@ export function ScenarioManager({
 
           {/* New scenario save button */}
           <button
-            onClick={() => setShowSaveModal(true)}
+            onClick={openSaveModal}
             className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white transition cursor-pointer shadow-md"
             title="Salvar como novo cenário"
           >
@@ -154,7 +208,7 @@ export function ScenarioManager({
 
           {/* Load scenario button */}
           <button
-            onClick={() => { setShowLoadModal(true); loadList(); }}
+            onClick={() => { setLoadError(null); setShowLoadModal(true); loadList(); }}
             className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition cursor-pointer shadow-md ${
               activeScenarioName
                 ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
@@ -205,12 +259,18 @@ export function ScenarioManager({
             <input
               type="text"
               value={scenarioName}
-              onChange={e => setScenarioName(e.target.value)}
+              onChange={e => { setScenarioName(e.target.value); setSaveError(null); }}
               placeholder="Nome do cenário..."
               className="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-sm outline-none focus:ring-2 focus:ring-blue-500"
               autoFocus
               onKeyDown={e => e.key === 'Enter' && handleSave()}
             />
+            {saveError && (
+              <p className="mt-2 text-xs text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 px-3 py-2 rounded-xl flex items-center gap-1.5">
+                <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                {saveError}
+              </p>
+            )}
             <div className="flex gap-2 mt-4 justify-end">
               <button
                 onClick={() => setShowSaveModal(false)}
@@ -241,7 +301,13 @@ export function ScenarioManager({
               </button>
             </div>
             <div className="flex-1 overflow-y-auto space-y-2">
-              {scenarios.length === 0 && (
+              {loadError && (
+                <p className="text-xs text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 px-3 py-2 rounded-xl flex items-center gap-1.5">
+                  <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                  {loadError}
+                </p>
+              )}
+              {scenarios.length === 0 && !loadError && (
                 <p className="text-sm text-slate-500 text-center py-8">Nenhum cenário salvo</p>
               )}
               {scenarios.map(s => {

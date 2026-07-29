@@ -18,8 +18,8 @@ app.get('/api/config', async (_req, res) => {
 
 app.put('/api/config', async (req, res) => {
   try {
-    const { colaboradores, teams, params, demanda_m3, demanda_pcs } = req.body;
-    await upsertConfig({ colaboradores, teams, params, demanda_m3, demanda_pcs });
+    const { colaboradores, teams, params, demanda_m3, demanda_pcs, pmt, prod_rate_m3, prod_rate_pcs, prod_unit } = req.body;
+    await upsertConfig({ colaboradores, teams, params, demanda_m3, demanda_pcs, pmt, prod_rate_m3, prod_rate_pcs, prod_unit });
     res.json({ ok: true });
   } catch (err) {
     console.error('Erro ao salvar config:', err);
@@ -55,9 +55,9 @@ app.get('/api/scenarios/:id', async (req, res) => {
 
 app.post('/api/scenarios', async (req, res) => {
   try {
-    const { name, teams, params, demanda_m3, demanda_pcs } = req.body;
+    const { name, teams, params, demanda_m3, demanda_pcs, pmt, prod_rate_m3, prod_rate_pcs, prod_unit } = req.body;
     if (!name) return res.status(400).json({ error: 'Nome é obrigatório' });
-    const scenario = await createScenario({ name, teams, params, demanda_m3, demanda_pcs });
+    const scenario = await createScenario({ name, teams, params, demanda_m3, demanda_pcs, pmt, prod_rate_m3, prod_rate_pcs, prod_unit });
     res.json(scenario);
   } catch (err) {
     console.error('Erro ao criar cenário:', err);
@@ -77,8 +77,8 @@ app.delete('/api/scenarios/:id', async (req, res) => {
 
 app.put('/api/scenarios/:id', async (req, res) => {
   try {
-    const { teams, params, demanda_m3, demanda_pcs } = req.body;
-    const updated = await updateScenario(Number(req.params.id), { teams, params, demanda_m3, demanda_pcs });
+    const { teams, params, demanda_m3, demanda_pcs, pmt, prod_rate_m3, prod_rate_pcs, prod_unit } = req.body;
+    const updated = await updateScenario(Number(req.params.id), { teams, params, demanda_m3, demanda_pcs, pmt, prod_rate_m3, prod_rate_pcs, prod_unit });
     res.json(updated);
   } catch (err) {
     console.error('Erro ao atualizar cenário:', err);

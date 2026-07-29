@@ -15,6 +15,10 @@ export async function upsertConfig(data: {
   params?: any;
   demanda_m3?: any;
   demanda_pcs?: any;
+  pmt?: any;
+  prod_rate_m3?: number | null;
+  prod_rate_pcs?: number | null;
+  prod_unit?: string | null;
 }) {
   return prisma.escalaConfig.upsert({
     where: { id: 1 },
@@ -25,6 +29,10 @@ export async function upsertConfig(data: {
       params: data.params ?? undefined,
       demanda_m3: data.demanda_m3 ?? undefined,
       demanda_pcs: data.demanda_pcs ?? undefined,
+      pmt: data.pmt ?? undefined,
+      prod_rate_m3: data.prod_rate_m3 ?? undefined,
+      prod_rate_pcs: data.prod_rate_pcs ?? undefined,
+      prod_unit: data.prod_unit ?? undefined,
     },
     update: {
       colaboradores: data.colaboradores ?? undefined,
@@ -32,6 +40,10 @@ export async function upsertConfig(data: {
       params: data.params ?? undefined,
       demanda_m3: data.demanda_m3 ?? undefined,
       demanda_pcs: data.demanda_pcs ?? undefined,
+      pmt: data.pmt ?? undefined,
+      prod_rate_m3: data.prod_rate_m3 ?? undefined,
+      prod_rate_pcs: data.prod_rate_pcs ?? undefined,
+      prod_unit: data.prod_unit ?? undefined,
       updated_at: new Date(),
     },
   });
@@ -54,6 +66,10 @@ export async function createScenario(data: {
   params?: any;
   demanda_m3?: any;
   demanda_pcs?: any;
+  pmt?: any;
+  prod_rate_m3?: number | null;
+  prod_rate_pcs?: number | null;
+  prod_unit?: string | null;
 }) {
   return prisma.scenario.create({ data });
 }
@@ -67,6 +83,10 @@ export async function updateScenario(id: number, data: {
   params?: any;
   demanda_m3?: any;
   demanda_pcs?: any;
+  pmt?: any;
+  prod_rate_m3?: number | null;
+  prod_rate_pcs?: number | null;
+  prod_unit?: string | null;
 }) {
   return prisma.scenario.update({
     where: { id },
@@ -75,6 +95,10 @@ export async function updateScenario(id: number, data: {
       params: data.params ?? undefined,
       demanda_m3: data.demanda_m3 ?? undefined,
       demanda_pcs: data.demanda_pcs ?? undefined,
+      pmt: data.pmt ?? undefined,
+      prod_rate_m3: data.prod_rate_m3 ?? undefined,
+      prod_rate_pcs: data.prod_rate_pcs ?? undefined,
+      prod_unit: data.prod_unit ?? undefined,
     },
   });
 }
