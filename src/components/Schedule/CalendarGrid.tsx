@@ -28,7 +28,8 @@ interface CalendarGridProps {
   prodRatePcsProp?: number;
   prodUnitProp?: 'm3' | 'pcs';
   onProdRateChange?: (rateM3: number, ratePcs: number, unit: 'm3' | 'pcs') => void;
-  onLoadScenario?: (data: { teams?: any; params?: any; demanda_m3?: any; demanda_pcs?: any; pmt_m3?: any; pmt_pcs?: any; prod_rate_m3?: number; prod_rate_pcs?: number; prod_unit?: string; scenarioName?: string; scenarioId?: number }) => void;
+  dadosMensais?: any;
+  onLoadScenario?: (data: { teams?: any; params?: any; dados_mensais?: any; prod_rate_m3?: number; prod_rate_pcs?: number; prod_unit?: string; scenarioName?: string; scenarioId?: number }) => void;
   activeScenarioName?: string;
   activeScenarioId?: number;
   isScenarioDirty?: boolean;
@@ -83,6 +84,7 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
   prodRatePcsProp,
   prodUnitProp,
   onProdRateChange,
+  dadosMensais,
   onLoadScenario,
   activeScenarioName,
   activeScenarioId,
@@ -99,7 +101,7 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
   // State holds array of collapsed group keys
   const [collapsedGroups, setCollapsedGroups] = useState<string[]>([]);
   // State holds array of collapsed summary panel keys (T1, T2, T3, CONSOLIDADO)
-  const [collapsedSummaryPanels, setCollapsedSummaryPanels] = useState<string[]>([]);
+  const [collapsedSummaryPanels, setCollapsedSummaryPanels] = useState<string[]>(['T1', 'T2', 'T3']);
 
   const toggleSummaryPanel = (key: string) => {
     if (collapsedSummaryPanels.includes(key)) {
@@ -109,84 +111,50 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
     }
   };
 
-  // Productivity rate (m³ or Pçs per collaborator per day)
-  const [prodRateM3, setProdRateM3] = useState<number>(prodRateM3Prop ?? 25);
-  const [prodRatePcs, setProdRatePcs] = useState<number>(prodRatePcsProp ?? 250);
-  const [prodUnit, setProdUnit] = useState<'m3' | 'pcs'>(prodUnitProp ?? 'm3');
+  const prodRateM3 = prodRateM3Prop ?? 25;
+  const prodRatePcs = prodRatePcsProp ?? 250;
+  const prodUnit = prodUnitProp ?? 'm3';
   const prodRate = prodUnit === 'm3' ? prodRateM3 : prodRatePcs;
 
-  // Sync prod rate from DB props
-  useEffect(() => {
-    if (prodRateM3Prop != null) setProdRateM3(prodRateM3Prop);
-  }, [prodRateM3Prop]);
-  useEffect(() => {
-    if (prodRatePcsProp != null) setProdRatePcs(prodRatePcsProp);
-  }, [prodRatePcsProp]);
-  useEffect(() => {
-    if (prodUnitProp != null) setProdUnit(prodUnitProp);
-  }, [prodUnitProp]);
-
-  const updateProdRateM3 = (val: number) => {
-    setProdRateM3(val);
-    onProdRateChange?.(val, prodRatePcs, prodUnit);
-  };
-  const updateProdRatePcs = (val: number) => {
-    setProdRatePcs(val);
-    onProdRateChange?.(prodRateM3, val, prodUnit);
-  };
-  const updateProdUnit = (val: 'm3' | 'pcs') => {
-    setProdUnit(val);
-    onProdRateChange?.(prodRateM3, prodRatePcs, val);
-  };
-
-  // PMT data (editable per-day values) — separate for m3 and pcs
-  const [pmtDataM3, setPmtDataM3] = useState<number[]>(() => Array(diasCount).fill(0));
-  const [pmtDataPcs, setPmtDataPcs] = useState<number[]>(() => Array(diasCount).fill(0));
-
+  const [editingPmtM3, setEditingPmtM3] = useState<number[]>(() =>
+    (pmtM3Prop ?? []).length >= diasCount ? (pmtM3Prop ?? []) : Array(diasCount).fill(0)
+  );
+  const [editingPmtPcs, setEditingPmtPcs] = useState<number[]>(() =>
+    (pmtPcsProp ?? []).length >= diasCount ? (pmtPcsProp ?? []) : Array(diasCount).fill(0)
+  );
   const pmtData = prodUnit === 'm3'
-    ? (pmtDataM3.length >= diasCount ? pmtDataM3 : Array(diasCount).fill(0))
-    : (pmtDataPcs.length >= diasCount ? pmtDataPcs : Array(diasCount).fill(0));
+    ? (editingPmtM3.length >= diasCount ? editingPmtM3 : Array(diasCount).fill(0))
+    : (editingPmtPcs.length >= diasCount ? editingPmtPcs : Array(diasCount).fill(0));
 
-  useEffect(() => {
-    if (pmtM3Prop !== undefined) {
-      setPmtDataM3(pmtM3Prop.length >= diasCount ? pmtM3Prop : Array(diasCount).fill(0));
-    }
-  }, [pmtM3Prop, diasCount]);
-  useEffect(() => {
-    if (pmtPcsProp !== undefined) {
-      setPmtDataPcs(pmtPcsProp.length >= diasCount ? pmtPcsProp : Array(diasCount).fill(0));
-    }
-  }, [pmtPcsProp, diasCount]);
+  useEffect(() => { setEditingPmtM3((pmtM3Prop ?? []).length >= diasCount ? (pmtM3Prop ?? []) : Array(diasCount).fill(0)); }, [pmtM3Prop, diasCount]);
+  useEffect(() => { setEditingPmtPcs((pmtPcsProp ?? []).length >= diasCount ? (pmtPcsProp ?? []) : Array(diasCount).fill(0)); }, [pmtPcsProp, diasCount]);
 
   const updatePmtM3Data = (val: number[]) => {
-    setPmtDataM3(val);
+    setEditingPmtM3(val);
     onPmtM3Change?.(val);
   };
   const updatePmtPcsData = (val: number[]) => {
-    setPmtDataPcs(val);
+    setEditingPmtPcs(val);
     onPmtPcsChange?.(val);
   };
+  const updateProdUnit = (unit: 'm3' | 'pcs') => {
+    onProdRateChange?.(prodRateM3, prodRatePcs, unit);
+  };
+
   // Team manager modal
   const [showTeamManager, setShowTeamManager] = useState(false);
 
-  // Daily demand store per shift (indexed T1, T2, T3) for m3
-  const [demandaDiariaM3, setDemandaDiariaM3] = useState<{ [key: string]: number[] }>({ T1: Array(28).fill(0), T2: Array(28).fill(0), T3: Array(28).fill(0) });
-  // Daily demand store per shift (indexed T1, T2, T3) for pcs
-  const [demandaDiariaPcs, setDemandaDiariaPcs] = useState<{ [key: string]: number[] }>({ T1: Array(28).fill(0), T2: Array(28).fill(0), T3: Array(28).fill(0) });
+  const [editingDemandaM3, setEditingDemandaM3] = useState<{ [key: string]: number[] }>(() =>
+    demandaDiariaM3Prop ?? { T1: Array(diasCount).fill(0), T2: Array(diasCount).fill(0), T3: Array(diasCount).fill(0) }
+  );
+  const [editingDemandaPcs, setEditingDemandaPcs] = useState<{ [key: string]: number[] }>(() =>
+    demandaDiariaPcsProp ?? { T1: Array(diasCount).fill(0), T2: Array(diasCount).fill(0), T3: Array(diasCount).fill(0) }
+  );
 
-  useEffect(() => {
-    if (demandaDiariaM3Prop) {
-      setDemandaDiariaM3(demandaDiariaM3Prop);
-    }
-  }, [demandaDiariaM3Prop]);
+  useEffect(() => { if (demandaDiariaM3Prop) setEditingDemandaM3(demandaDiariaM3Prop); }, [demandaDiariaM3Prop]);
+  useEffect(() => { if (demandaDiariaPcsProp) setEditingDemandaPcs(demandaDiariaPcsProp); }, [demandaDiariaPcsProp]);
 
-  useEffect(() => {
-    if (demandaDiariaPcsProp) {
-      setDemandaDiariaPcs(demandaDiariaPcsProp);
-    }
-  }, [demandaDiariaPcsProp]);
-
-  const demandaDiaria = prodUnit === 'm3' ? demandaDiariaM3 : demandaDiariaPcs;
+  const demandaDiaria = prodUnit === 'm3' ? editingDemandaM3 : editingDemandaPcs;
 
   const capacityStats = useMemo(() => {
     const baseT1 = selectedShifts.includes('T1') ? (params?.conferentesT1 ?? 0) : 0;
@@ -203,27 +171,71 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
     const capacidadeTeorica = baseHC * prodRate * efectiveDias;
 
     let totalWorkDays = 0;
-    colaboradores.forEach(c => {
-      if (selectedShifts.includes(c.turno)) {
-        c.escala.slice(0, efectiveDias).forEach(status => {
-          if (status === 'WORK') {
-            totalWorkDays++;
-          }
-        });
-      }
+    let totalOffDays = 0;
+    const activeColabs = colaboradores.filter(c => selectedShifts.includes(c.turno));
+    const activeColabsCount = activeColabs.length;
+
+    activeColabs.forEach(c => {
+      c.escala.slice(0, efectiveDias).forEach(status => {
+        if (status === 'WORK') {
+          totalWorkDays++;
+        } else if (status === 'OFF') {
+          totalOffDays++;
+        }
+      });
     });
+
+    const avgWorkDays = activeColabsCount > 0 ? Math.round(totalWorkDays / activeColabsCount) : 0;
+    const avgOffDays = activeColabsCount > 0 ? Math.round(totalOffDays / activeColabsCount) : 0;
+
     const capacidadeReal = totalWorkDays * prodRate;
 
     const perdaCapacidade = capacidadeTeorica > 0
       ? ((capacidadeReal - capacidadeTeorica) / capacidadeTeorica) * 100
       : 0;
 
+    // Dimensionamento e Ociosidade Lógica:
+    const capacidadePorColab = baseHC > 0 ? (capacidadeReal / baseHC) : 0;
+    const pmtTotal = pmtData.reduce((a, b) => a + b, 0);
+    const colabsNecessarios = capacidadePorColab > 0 ? Math.ceil(pmtTotal / capacidadePorColab) : 0;
+    const colabsExcedentes = baseHC - colabsNecessarios;
+    const percentualOciosidade = baseHC > 0 ? (colabsExcedentes / baseHC) * 100 : 0;
+
+    // Status da Operação Lógica:
+    let opStatus = "Capacidade Total Utilizada";
+    let opStatusColor = "amber";
+    let opAbsolute = 0;
+    let opPercent = 0;
+
+    if (pmtTotal < capacidadeReal) {
+      opStatus = "Ganho de Capacidade";
+      opStatusColor = "emerald";
+      opAbsolute = capacidadeReal - pmtTotal;
+      opPercent = capacidadeReal > 0 ? (opAbsolute / capacidadeReal) * 100 : 0;
+    } else if (pmtTotal > capacidadeReal) {
+      opStatus = "Perda de Capacidade";
+      opStatusColor = "red";
+      opAbsolute = pmtTotal - capacidadeReal;
+      opPercent = capacidadeReal > 0 ? (opAbsolute / capacidadeReal) * 100 : 0;
+    }
+
     return {
       capacidadeTeorica,
       capacidadeReal,
-      perdaCapacidade: Math.round(perdaCapacidade * 10) / 10
+      perdaCapacidade: Math.round(perdaCapacidade * 10) / 10,
+      avgWorkDays,
+      avgOffDays,
+      capacidadePorColab,
+      colabsNecessarios,
+      colabsExcedentes,
+      percentualOciosidade,
+      baseHC,
+      opStatus,
+      opStatusColor,
+      opAbsolute,
+      opPercent,
     };
-  }, [colaboradores, params, prodRate, diasCount, selectedShifts]);
+  }, [colaboradores, params, prodRate, diasCount, selectedShifts, pmtData]);
 
 
   const toggleShift = (shift: string) => {
@@ -244,16 +256,16 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
 
   const handleDemandaChange = (shift: string, dayIdx: number, val: number) => {
     if (prodUnit === 'm3') {
-      const newDemanda = { ...demandaDiariaM3 };
+      const newDemanda = { ...editingDemandaM3 };
       if (!newDemanda[shift]) newDemanda[shift] = Array(diasCount).fill(0);
       newDemanda[shift][dayIdx] = val;
-      setDemandaDiariaM3(newDemanda);
+      setEditingDemandaM3(newDemanda);
       if (onDemandaChangeM3) onDemandaChangeM3(newDemanda);
     } else {
-      const newDemanda = { ...demandaDiariaPcs };
+      const newDemanda = { ...editingDemandaPcs };
       if (!newDemanda[shift]) newDemanda[shift] = Array(diasCount).fill(0);
       newDemanda[shift][dayIdx] = val;
-      setDemandaDiariaPcs(newDemanda);
+      setEditingDemandaPcs(newDemanda);
       if (onDemandaChangePcs) onDemandaChangePcs(newDemanda);
     }
   };
@@ -354,6 +366,14 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
   const expandAll = () => {
     setCollapsedGroups([]);
   };
+
+  const isFirstGroupsLoad = React.useRef(true);
+  useEffect(() => {
+    if (isFirstGroupsLoad.current && sortedGroups.length > 0) {
+      setCollapsedGroups(sortedGroups.map(g => g.key));
+      isFirstGroupsLoad.current = false;
+    }
+  }, [sortedGroups]);
 
   // Helper to render employee row
   const renderColaboradorRow = (colab: Colaborador) => {
@@ -531,10 +551,7 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
               teams={teams}
               params={params}
               colaboradores={colaboradores}
-              demanda_m3={demandaDiariaM3Prop}
-              demanda_pcs={demandaDiariaPcsProp}
-              pmt_m3={pmtDataM3}
-              pmt_pcs={pmtDataPcs}
+              dados_mensais={dadosMensais}
               prod_rate_m3={prodRateM3}
               prod_rate_pcs={prodRatePcs}
               prod_unit={prodUnit}
@@ -596,7 +613,7 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
 
 
       {/* Painel de Capacidade & Produtividade */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6 noprint">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-6 noprint">
         {/* Card 1: Meta de Produtividade */}
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-4 shadow-sm flex flex-col justify-between">
           <div>
@@ -643,9 +660,9 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
               onChange={(e) => {
                 const val = Math.max(1, parseInt(e.target.value) || 0);
                 if (prodUnit === 'm3') {
-                  updateProdRateM3(val);
+                  onProdRateChange?.(val, prodRatePcs, 'm3');
                 } else {
-                  updateProdRatePcs(val);
+                  onProdRateChange?.(prodRateM3, val, 'pcs');
                 }
               }}
               className="w-20 text-lg font-black text-slate-800 dark:text-slate-100 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-2 py-1.5 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 text-center"
@@ -660,13 +677,46 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-4 shadow-sm flex flex-col justify-between">
           <div>
             <h5 className="text-[9px] font-black text-slate-450 dark:text-slate-555 uppercase tracking-wider">PMT</h5>
-            <div className="flex items-baseline gap-1 mt-3">
-              <span className="text-3xl font-black text-slate-800 dark:text-slate-100">{pmtData.reduce((a, b) => a + b, 0).toLocaleString('pt-BR')}</span>
-              <span className="text-xs font-bold text-slate-400">{prodUnit === 'm3' ? 'm³' : 'Pçs'}</span>
+            <div className="flex items-center justify-between mt-3">
+              <div className="flex items-baseline gap-1">
+                <span className="text-3xl font-black text-slate-800 dark:text-slate-100">
+                  {pmtData.reduce((a, b) => a + b, 0).toLocaleString('pt-BR')}
+                </span>
+                <span className="text-xs font-bold text-slate-400">{prodUnit === 'm3' ? 'm³' : 'Pçs'}</span>
+              </div>
+              <div className="flex items-center gap-1 bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800 px-2 py-1 rounded-xl text-xs text-slate-600 dark:text-slate-350 font-bold" title="Colaboradores necessários">
+                <User className="w-3.5 h-3.5 text-slate-400" />
+                <span>{capacityStats.colabsNecessarios}</span>
+              </div>
             </div>
           </div>
-          <p className="text-[10px] text-slate-400 mt-4">
-            Total mensal — dados inseridos manualmente na linha PMT
+          <div className="text-[10px] text-slate-500 dark:text-slate-400 mt-2 font-medium">
+            {capacityStats.avgWorkDays > 0 ? (
+              prodUnit === 'm3' ? (
+                <>
+                  <div className="font-bold text-slate-700 dark:text-slate-350">
+                    Média: {Math.round(editingPmtM3.reduce((a, b) => a + b, 0) / capacityStats.avgWorkDays).toLocaleString('pt-BR')} m³/dia em {capacityStats.avgWorkDays} dias
+                  </div>
+                  <div className="text-[9px] text-slate-400">
+                    Média Pçs: {Math.round(editingPmtPcs.reduce((a, b) => a + b, 0) / capacityStats.avgWorkDays).toLocaleString('pt-BR')} Pçs/dia
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="font-bold text-slate-700 dark:text-slate-350">
+                    Média: {Math.round(editingPmtPcs.reduce((a, b) => a + b, 0) / capacityStats.avgWorkDays).toLocaleString('pt-BR')} Pçs/dia em {capacityStats.avgWorkDays} dias
+                  </div>
+                  <div className="text-[9px] text-slate-400">
+                    Média m³: {Math.round(editingPmtM3.reduce((a, b) => a + b, 0) / capacityStats.avgWorkDays).toLocaleString('pt-BR')} m³/dia
+                  </div>
+                </>
+              )
+            ) : (
+              <div className="font-bold text-slate-400">Nenhum dia de trabalho na escala</div>
+            )}
+          </div>
+          <p className="text-[9px] text-slate-400/80 mt-2">
+            Média obtida dividindo o PMT total pelos dias de trabalho na escala
           </p>
         </div>
 
@@ -674,12 +724,26 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-4 shadow-sm flex flex-col justify-between">
           <div>
             <h5 className="text-[9px] font-black text-slate-450 dark:text-slate-555 uppercase tracking-wider">Capacidade com Folgas</h5>
-            <div className="flex items-baseline gap-1 mt-3">
-              <span className="text-3xl font-black text-blue-600 dark:text-blue-400">{capacityStats.capacidadeReal.toLocaleString('pt-BR')}</span>
-              <span className="text-xs font-bold text-blue-400">{prodUnit === 'm3' ? 'm³' : 'Pçs'}</span>
+            <div className="flex items-center justify-between mt-3">
+              <div className="flex items-baseline gap-1">
+                <span className="text-3xl font-black text-blue-600 dark:text-blue-400">{capacityStats.capacidadeReal.toLocaleString('pt-BR')}</span>
+                <span className="text-xs font-bold text-blue-400">{prodUnit === 'm3' ? 'm³' : 'Pçs'}</span>
+              </div>
+              <div className="flex items-center gap-1 bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800 px-2 py-1 rounded-xl text-xs text-slate-600 dark:text-slate-350 font-bold" title="Total de colaboradores escalados">
+                <User className="w-3.5 h-3.5 text-slate-400" />
+                <span>{capacityStats.baseHC}</span>
+              </div>
             </div>
           </div>
-          <div className="flex items-center gap-1.5 text-[9px] text-emerald-600 dark:text-emerald-400 font-bold mt-4 pt-2 border-t border-slate-100 dark:border-slate-800/50">
+          <div className="text-[10px] text-slate-500 dark:text-slate-400 mt-2 font-medium">
+            <div className="font-bold text-slate-700 dark:text-slate-350">
+              Escala: {capacityStats.avgWorkDays} dias trabalhados
+            </div>
+            <div className="text-[9px] text-slate-400">
+              Folgas: {capacityStats.avgOffDays} folgas no mês
+            </div>
+          </div>
+          <div className="flex items-center gap-1.5 text-[9px] text-emerald-600 dark:text-emerald-400 font-bold mt-2 pt-2 border-t border-slate-100 dark:border-slate-800/50">
             <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
             <span>Capacidade real de atendimento</span>
           </div>
@@ -688,14 +752,86 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
         {/* Card 4: Perda de Capacidade */}
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-4 shadow-sm flex flex-col justify-between">
           <div>
-            <h5 className="text-[9px] font-black text-slate-450 dark:text-slate-555 uppercase tracking-wider">Perda de Capacidade</h5>
-            <div className="flex items-baseline gap-1.5 mt-3">
-              <span className="text-3xl font-black text-orange-500 dark:text-orange-400">{capacityStats.perdaCapacidade}%</span>
-              <TrendingDown className="w-4 h-4 text-orange-500 dark:text-orange-400 self-center" />
+            <h5 className="text-[9px] font-black text-slate-450 dark:text-slate-555 uppercase tracking-wider">Status da Operação</h5>
+            <div className="flex items-center gap-1.5 mt-3">
+              <span className="text-xl">
+                {capacityStats.opStatusColor === 'emerald' ? '🟢' : capacityStats.opStatusColor === 'red' ? '🔴' : '🟡'}
+              </span>
+              <span className={`text-[12px] font-black uppercase tracking-wider leading-tight ${
+                capacityStats.opStatusColor === 'emerald'
+                  ? 'text-emerald-600 dark:text-emerald-400'
+                  : capacityStats.opStatusColor === 'red'
+                    ? 'text-red-500 dark:text-red-400'
+                    : 'text-amber-500 dark:text-amber-400'
+              }`}>
+                {capacityStats.opStatus}
+              </span>
             </div>
           </div>
-          <p className="text-[10px] text-slate-400 mt-4">
-            Redução operacional devido à escala 5x2
+          <div className="text-[10px] text-slate-500 dark:text-slate-400 mt-2 font-medium space-y-1">
+            <div>
+              {capacityStats.opStatusColor === 'emerald' ? 'Excesso/Ganho' : capacityStats.opStatusColor === 'red' ? 'Defasagem/Perda' : 'Diferença'}:{' '}
+              <span className="font-bold text-slate-700 dark:text-slate-350">
+                {capacityStats.opAbsolute.toLocaleString('pt-BR')} {prodUnit === 'm3' ? 'm³' : 'Pçs'}
+              </span>
+            </div>
+            <div>
+              Percentual:{' '}
+              <span className={`font-bold ${
+                capacityStats.opStatusColor === 'emerald'
+                  ? 'text-emerald-600 dark:text-emerald-400'
+                  : capacityStats.opStatusColor === 'red'
+                    ? 'text-red-500 dark:text-red-400'
+                    : 'text-amber-500 dark:text-amber-400'
+              }`}>
+                {capacityStats.opPercent.toFixed(2)}%
+              </span>
+            </div>
+          </div>
+          <p className="text-[9px] text-slate-400/80 mt-2 pt-2 border-t border-slate-100 dark:border-slate-800/50">
+            Comparação da capacidade real com o PMT do mês
+          </p>
+        </div>
+
+        {/* Card 5: Dimensionamento de Equipe */}
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-4 shadow-sm flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <div className="flex items-center gap-2">
+                <span className="p-1 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg">
+                  <User className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                </span>
+                <h5 className="text-[9px] font-black text-slate-450 dark:text-slate-555 uppercase tracking-wider">Dimensionamento</h5>
+              </div>
+            </div>
+            <div className="flex items-baseline gap-1 mt-3">
+              <span className={`text-3xl font-black ${capacityStats.colabsExcedentes >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500 dark:text-red-400'}`}>
+                {capacityStats.colabsExcedentes >= 0 ? `+${capacityStats.colabsExcedentes}` : capacityStats.colabsExcedentes}
+              </span>
+              <span className="text-xs font-bold text-slate-400 ml-1">colabs excedentes</span>
+            </div>
+          </div>
+          <div className="text-[10px] text-slate-500 dark:text-slate-400 mt-2 font-medium space-y-1">
+            <div className="flex items-center gap-1 text-slate-700 dark:text-slate-350">
+              <User className="w-3.5 h-3.5 text-slate-400" />
+              <span>Total de colaboradores: <span className="font-bold">{capacityStats.baseHC}</span></span>
+            </div>
+            <div>
+              Capac. mensal/colab: <span className="font-bold text-slate-700 dark:text-slate-350">{Math.round(capacityStats.capacidadePorColab).toLocaleString('pt-BR')} {prodUnit === 'm3' ? 'm³' : 'Pçs'}</span>
+            </div>
+            <div>
+              Necessários: <span className="font-bold text-slate-700 dark:text-slate-350">{capacityStats.colabsNecessarios} colabs</span>
+            </div>
+            <div>
+              {capacityStats.colabsExcedentes >= 0 ? (
+                <>Ociosidade: <span className="font-bold text-emerald-600 dark:text-emerald-400">{capacityStats.percentualOciosidade.toFixed(1)}%</span></>
+              ) : (
+                <>Sobrecarga: <span className="font-bold text-red-500 dark:text-red-400">{Math.abs(capacityStats.percentualOciosidade).toFixed(1)}%</span></>
+              )}
+            </div>
+          </div>
+          <p className="text-[9px] text-slate-400/80 mt-2 pt-2 border-t border-slate-100 dark:border-slate-800/50">
+            Cálculo dinâmico baseado na escala e PMT do mês
           </p>
         </div>
       </div>

@@ -8,29 +8,31 @@ datasource db {
 }
 
 model EscalaConfig {
-  id           Int      @id @default(1)
+  id            Int      @id @default(1)
   colaboradores Json?
-  teams        Json?
-  params       Json?
-  demanda_m3   Json?
-  demanda_pcs  Json?
-  pmt          Json?
-  prod_rate_m3  Int?
-  prod_rate_pcs Int?
-  prod_unit    String?
-  updated_at   DateTime @default(now()) @db.Timestamptz
+  teams         Json?
+  params        Json?
+  demanda_m3    Json?
+  demanda_pcs   Json?
+  pmt           Json?
+  dados_mensais Json?
+  prod_rate_m3   Int?
+  prod_rate_pcs  Int?
+  prod_unit     String?
+  updated_at    DateTime @default(now()) @db.Timestamptz
 }
 
 model Scenario {
-  id         Int      @id @default(autoincrement())
-  name       String
-  teams      Json?
-  params     Json?
-  demanda_m3 Json?
-  demanda_pcs Json?
-  pmt        Json?
-  prod_rate_m3  Int?
-  prod_rate_pcs Int?
-  prod_unit    String?
-  created_at DateTime @default(now()) @db.Timestamptz
+  id            Int      @id @default(autoincrement())
+  name          String
+  teams         Json?
+  params        Json?
+  demanda_m3    Json?
+  demanda_pcs   Json?
+  pmt           Json?
+  dados_mensais Json?
+  prod_rate_m3   Int?
+  prod_rate_pcs  Int?
+  prod_unit     String?
+  created_at    DateTime @default(now()) @db.Timestamptz
 }

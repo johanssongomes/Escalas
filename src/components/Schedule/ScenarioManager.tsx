@@ -2,13 +2,12 @@ import { useState, useEffect } from 'react';
 import { listScenarios, createScenario, deleteScenario, getScenario, updateScenario, type ScenarioSummary } from '../../utils/apiClient';
 import { Save, FolderOpen, Trash2, X, Check, CheckCircle2, AlertCircle, RefreshCw } from 'lucide-react';
 
+import type { DadosMensais } from '../../types';
+
 interface Props {
   teams?: any;
   params?: any;
-  demanda_m3?: any;
-  demanda_pcs?: any;
-  pmt_m3?: any;
-  pmt_pcs?: any;
+  dados_mensais?: DadosMensais;
   prod_rate_m3?: number;
   prod_rate_pcs?: number;
   prod_unit?: string;
@@ -16,12 +15,12 @@ interface Props {
   activeScenarioName?: string;
   activeScenarioId?: number;
   isScenarioDirty?: boolean;
-  onLoadScenario: (data: { teams?: any; params?: any; demanda_m3?: any; demanda_pcs?: any; pmt_m3?: any; pmt_pcs?: any; prod_rate_m3?: number; prod_rate_pcs?: number; prod_unit?: string; scenarioName?: string; scenarioId?: number }) => void;
+  onLoadScenario: (data: { teams?: any; params?: any; dados_mensais?: DadosMensais; prod_rate_m3?: number; prod_rate_pcs?: number; prod_unit?: string; scenarioName?: string; scenarioId?: number }) => void;
   onScenarioSaved?: () => void;
 }
 
 export function ScenarioManager({
-  teams, params, demanda_m3, demanda_pcs, pmt_m3, pmt_pcs, prod_rate_m3, prod_rate_pcs, prod_unit, colaboradores,
+  teams, params, dados_mensais, prod_rate_m3, prod_rate_pcs, prod_unit, colaboradores,
   activeScenarioName, activeScenarioId, isScenarioDirty,
   onLoadScenario, onScenarioSaved,
 }: Props) {
@@ -68,9 +67,7 @@ export function ScenarioManager({
         name: scenarioName.trim(),
         teams,
         params: updatedParams,
-        demanda_m3,
-        demanda_pcs,
-        pmt: { m3: pmt_m3, pcs: pmt_pcs },
+        dados_mensais,
         prod_rate_m3,
         prod_rate_pcs,
         prod_unit,
@@ -93,16 +90,10 @@ export function ScenarioManager({
     setLoadError(null);
     try {
       const scenario = await getScenario(id);
-      const pmtData = scenario.pmt;
-      const pmtM3 = Array.isArray(pmtData) ? pmtData : pmtData?.m3;
-      const pmtPcs = !Array.isArray(pmtData) ? pmtData?.pcs : undefined;
       onLoadScenario({
         teams: scenario.teams ?? undefined,
         params: scenario.params ?? undefined,
-        demanda_m3: scenario.demanda_m3 ?? undefined,
-        demanda_pcs: scenario.demanda_pcs ?? undefined,
-        pmt_m3: pmtM3 ?? undefined,
-        pmt_pcs: pmtPcs ?? undefined,
+        dados_mensais: scenario.dados_mensais as DadosMensais | undefined,
         prod_rate_m3: scenario.prod_rate_m3 ?? undefined,
         prod_rate_pcs: scenario.prod_rate_pcs ?? undefined,
         prod_unit: scenario.prod_unit ?? undefined,
@@ -153,7 +144,7 @@ export function ScenarioManager({
           [`${params?.month}_${params?.year}`]: colaboradores ?? [],
         },
       };
-      await updateScenario(activeScenarioId, { teams, params: updatedParams, demanda_m3, demanda_pcs, pmt: { m3: pmt_m3, pcs: pmt_pcs }, prod_rate_m3, prod_rate_pcs, prod_unit });
+      await updateScenario(activeScenarioId, { teams, params: updatedParams, dados_mensais, prod_rate_m3, prod_rate_pcs, prod_unit });
       setSaveSuccess(true);
       onScenarioSaved?.();
       setTimeout(() => setSaveSuccess(false), 2500);

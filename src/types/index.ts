@@ -62,6 +62,16 @@ export interface DashboardIndicators {
   eficienciaEscala: number;
 }
 
+export interface DadosMes {
+  demandaM3: { T1: number[]; T2: number[]; T3: number[] };
+  demandaPcs: { T1: number[]; T2: number[]; T3: number[] };
+  pmtM3: number[];
+  pmtPcs: number[];
+  teams?: TeamConfig[];
+}
+
+export type DadosMensais = Record<string, DadosMes>;
+
 export interface ScheduleParams {
   conferentesT1: number;
   conferentesT2: number;

@@ -13,6 +13,7 @@ export async function saveConfig(data: {
   demanda_m3?: any;
   demanda_pcs?: any;
   pmt?: any;
+  dados_mensais?: any;
   prod_rate_m3?: number;
   prod_rate_pcs?: number;
   prod_unit?: string;
@@ -45,6 +46,7 @@ export interface ScenarioData {
   demanda_m3?: any;
   demanda_pcs?: any;
   pmt?: any;
+  dados_mensais?: any;
   prod_rate_m3?: number;
   prod_rate_pcs?: number;
   prod_unit?: string;
@@ -64,6 +66,7 @@ export async function createScenario(data: {
   demanda_m3?: any;
   demanda_pcs?: any;
   pmt?: any;
+  dados_mensais?: any;
   prod_rate_m3?: number;
   prod_rate_pcs?: number;
   prod_unit?: string;
@@ -88,6 +91,7 @@ export async function updateScenario(id: number, data: {
   demanda_m3?: any;
   demanda_pcs?: any;
   pmt?: any;
+  dados_mensais?: any;
   prod_rate_m3?: number;
   prod_rate_pcs?: number;
   prod_unit?: string;

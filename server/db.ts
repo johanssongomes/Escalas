@@ -16,6 +16,7 @@ export async function upsertConfig(data: {
   demanda_m3?: any;
   demanda_pcs?: any;
   pmt?: any;
+  dados_mensais?: any;
   prod_rate_m3?: number | null;
   prod_rate_pcs?: number | null;
   prod_unit?: string | null;
@@ -30,6 +31,7 @@ export async function upsertConfig(data: {
       demanda_m3: data.demanda_m3 ?? undefined,
       demanda_pcs: data.demanda_pcs ?? undefined,
       pmt: data.pmt ?? undefined,
+      dados_mensais: data.dados_mensais ?? undefined,
       prod_rate_m3: data.prod_rate_m3 ?? undefined,
       prod_rate_pcs: data.prod_rate_pcs ?? undefined,
       prod_unit: data.prod_unit ?? undefined,
@@ -41,6 +43,7 @@ export async function upsertConfig(data: {
       demanda_m3: data.demanda_m3 ?? undefined,
       demanda_pcs: data.demanda_pcs ?? undefined,
       pmt: data.pmt ?? undefined,
+      dados_mensais: data.dados_mensais ?? undefined,
       prod_rate_m3: data.prod_rate_m3 ?? undefined,
       prod_rate_pcs: data.prod_rate_pcs ?? undefined,
       prod_unit: data.prod_unit ?? undefined,
@@ -67,6 +70,7 @@ export async function createScenario(data: {
   demanda_m3?: any;
   demanda_pcs?: any;
   pmt?: any;
+  dados_mensais?: any;
   prod_rate_m3?: number | null;
   prod_rate_pcs?: number | null;
   prod_unit?: string | null;
@@ -84,6 +88,7 @@ export async function updateScenario(id: number, data: {
   demanda_m3?: any;
   demanda_pcs?: any;
   pmt?: any;
+  dados_mensais?: any;
   prod_rate_m3?: number | null;
   prod_rate_pcs?: number | null;
   prod_unit?: string | null;
@@ -96,6 +101,7 @@ export async function updateScenario(id: number, data: {
       demanda_m3: data.demanda_m3 ?? undefined,
       demanda_pcs: data.demanda_pcs ?? undefined,
       pmt: data.pmt ?? undefined,
+      dados_mensais: data.dados_mensais ?? undefined,
       prod_rate_m3: data.prod_rate_m3 ?? undefined,
       prod_rate_pcs: data.prod_rate_pcs ?? undefined,
       prod_unit: data.prod_unit ?? undefined,

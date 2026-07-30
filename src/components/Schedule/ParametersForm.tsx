@@ -86,15 +86,16 @@ export const ParametersForm: React.FC<ParametersFormProps> = ({
         setValue('weeks', calculatedWeeks);
         setPrevWeeks(calculatedWeeks);
         setPrevDias(calculatedDays);
+        onChange({ ...watchedValues, dias: calculatedDays, weeks: calculatedWeeks } as ScheduleParams);
       } else if (currentMonth === -1) {
         setValue('dias', 28);
         setValue('weeks', 4);
         setPrevWeeks(4);
         setPrevDias(28);
+        onChange({ ...watchedValues, dias: 28, weeks: 4 } as ScheduleParams);
       }
       setPrevMonth(currentMonth);
       setPrevYear(currentYear);
-      // Skip onChange – let setValue trigger a new render with corrected dias/weeks
       return;
     }
     if (currentWeeks !== prevWeeks) {
