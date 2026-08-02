@@ -1,8 +1,10 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import type { Colaborador, ScheduleParams, TeamConfig } from '../../types';
-import { Calendar, User, Filter, Layers, ChevronDown, ChevronRight, ChevronsUpDown, Settings2, Calculator, CheckCircle2, TrendingDown } from 'lucide-react';
+import { Calendar, User, Filter, Layers, ChevronDown, ChevronRight, ChevronsUpDown, Settings2, Calculator, CheckCircle2, FileSpreadsheet } from 'lucide-react';
 import { TeamManagerModal } from './TeamManagerModal';
 import { ScenarioManager } from './ScenarioManager';
+import { ImportPmtModal } from './ImportPmtModal';
+import { ImportDemandaModal } from './ImportDemandaModal';
 
 interface CalendarGridProps {
   colaboradores: Colaborador[];
@@ -143,6 +145,9 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
 
   // Team manager modal
   const [showTeamManager, setShowTeamManager] = useState(false);
+  const [isImportPmtOpen, setIsImportPmtOpen] = useState(false);
+  const [isImportDemandaOpen, setIsImportDemandaOpen] = useState(false);
+  const [importDemandaActiveShift, setImportDemandaActiveShift] = useState<'T1' | 'T2' | 'T3'>('T1');
 
   const [editingDemandaM3, setEditingDemandaM3] = useState<{ [key: string]: number[] }>(() =>
     demandaDiariaM3Prop ?? { T1: Array(diasCount).fill(0), T2: Array(diasCount).fill(0), T3: Array(diasCount).fill(0) }
@@ -1012,7 +1017,7 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
 
             {/* Nível de Cobertura Diária Row */}
             <tr className="bg-slate-50/50 dark:bg-slate-900/40 border-t-2 border-b border-slate-200 dark:border-slate-800 transition">
-              <td className="p-1 sticky left-0 z-20 bg-slate-50 dark:bg-slate-900 border-r border-b border-slate-200 dark:border-slate-800 font-black text-[9px] shadow-sm text-slate-700 dark:text-slate-300 uppercase tracking-wider">
+              <td className="p-1 sticky left-0 z-20 bg-slate-50 dark:bg-slate-900 border-r border-b border-slate-200 dark:border-slate-800 font-black text-[8.5px] shadow-sm text-slate-700 dark:text-slate-300 uppercase tracking-wider whitespace-nowrap">
                 Cobertura %
               </td>
               {Array.from({ length: diasCount }).map((_, d) => {
@@ -1067,6 +1072,263 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
                 </div>
               </td>
             </tr>
+
+            {/* Total Geral Summary Group */}
+            {selectedShifts.length > 1 && (
+              <>
+                {/* Visual Shift Header */}
+                <tr 
+                  onClick={() => toggleSummaryPanel('CONSOLIDADO')}
+                  className="bg-slate-50 dark:bg-slate-955 text-[9px] font-extrabold border-t-2 border-slate-200 dark:border-slate-800 cursor-pointer select-none"
+                >
+                  <td colSpan={diasCount + 2} className="p-1.5 px-3 text-white bg-slate-700 dark:bg-slate-800 border-l-4 border-slate-800 shadow-sm animate-none">
+                    <span className="sticky left-3 z-10 flex items-center gap-1.5">
+                      {collapsedSummaryPanels.includes('CONSOLIDADO') ? (
+                        <ChevronRight className="w-3.5 h-3.5 text-white" />
+                      ) : (
+                        <ChevronDown className="w-3.5 h-3.5 text-white" />
+                      )}
+                      <span>CONSOLIDADO GERAL (TODOS OS TURNOS)</span>
+                    </span>
+                  </td>
+                </tr>
+                {!collapsedSummaryPanels.includes('CONSOLIDADO') && (
+                <>
+                <tr className="hover:bg-slate-50/50 transition">
+                  <td className="p-1 sticky left-0 z-20 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 font-bold text-[9px] shadow-sm text-slate-700 dark:text-slate-300">
+                    Ativos Geral
+                  </td>
+                  {Array.from({ length: diasCount }).map((_, d) => {
+                    const count = colaboradores.filter(c => selectedShifts.includes(c.turno) && c.escala[d] === 'WORK').length;
+                    const isSun = d % 7 === 6;
+                    return (
+                      <td
+                        key={d}
+                        className={`p-0.5 text-center text-[9px] font-black text-slate-700 dark:text-slate-300 ${
+                          isSun 
+                            ? 'border-r-2 border-slate-300 dark:border-slate-700' 
+                            : 'border-r border-slate-200 dark:border-slate-800'
+                        }`}
+                      >
+                        {count}
+                      </td>
+                    );
+                  })}
+                  {/* Summary Cell */}
+                  <td className="p-0.5 text-center text-[9px] font-bold bg-slate-50/40 dark:bg-slate-900/20 border-l border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300">
+                    <div className="flex flex-col items-center">
+                      <span>{Math.round(Array.from({ length: diasCount }).map((_, d) => colaboradores.filter(c => selectedShifts.includes(c.turno) && c.escala[d] === 'WORK').length).reduce((a, b) => a + b, 0) / diasCount)}</span>
+                    </div>
+                  </td>
+                </tr>
+                <tr className="hover:bg-slate-50/50 transition">
+                  <td className="p-1 sticky left-0 z-20 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 font-bold text-[9px] shadow-sm text-slate-700 dark:text-slate-300">
+                    Capac. Geral
+                  </td>
+                  {Array.from({ length: diasCount }).map((_, d) => {
+                    const count = colaboradores.filter(c => selectedShifts.includes(c.turno) && c.escala[d] === 'WORK').length;
+                    const cap = count * prodRate;
+                    const isSun = d % 7 === 6;
+                    return (
+                      <td
+                        key={d}
+                        className={`p-0.5 text-center text-[9px] font-black text-blue-600 dark:text-blue-400 ${
+                          isSun 
+                            ? 'border-r-2 border-slate-300 dark:border-slate-700' 
+                            : 'border-r border-slate-200 dark:border-slate-800'
+                        }`}
+                      >
+                        {cap.toLocaleString('pt-BR')}
+                      </td>
+                    );
+                  })}
+                  {/* Summary Cell */}
+                  <td className="p-0.5 text-center text-[9px] font-bold bg-slate-50/40 dark:bg-slate-900/20 border-l border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300">
+                    <div className="flex flex-col items-center">
+                      <span>{Array.from({ length: diasCount }).map((_, d) => colaboradores.filter(c => selectedShifts.includes(c.turno) && c.escala[d] === 'WORK').length * prodRate).reduce((a, b) => a + b, 0).toLocaleString('pt-BR')}</span>
+                    </div>
+                  </td>
+                </tr>
+                <tr className="hover:bg-slate-50/50 transition">
+                  <td className="p-1 sticky left-0 z-20 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 font-bold text-[9px] shadow-sm text-slate-700 dark:text-slate-300">
+                    Demand. Geral
+                  </td>
+                  {Array.from({ length: diasCount }).map((_, d) => {
+                    let totalDemand = 0;
+                    selectedShifts.forEach(s => {
+                      totalDemand += (demandaDiaria[s] && demandaDiaria[s][d]) || 0;
+                    });
+                    const isSun = d % 7 === 6;
+                    return (
+                      <td
+                        key={d}
+                        className={`p-0.5 text-center text-[9px] font-black text-slate-700 dark:text-slate-300 ${
+                          isSun 
+                            ? 'border-r-2 border-slate-300 dark:border-slate-700' 
+                            : 'border-r border-slate-200 dark:border-slate-800'
+                        }`}
+                      >
+                        {totalDemand.toLocaleString('pt-BR')}
+                      </td>
+                    );
+                  })}
+                  <td className="p-0.5 text-center text-[9px] font-bold bg-slate-50/40 dark:bg-slate-900/20 border-l border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300">
+                    <div className="flex flex-col items-center">
+                      <span>{(Array.from({ length: diasCount }).map((_, d) => selectedShifts.reduce((acc, s) => acc + ((demandaDiaria[s] && demandaDiaria[s][d]) || 0), 0)).reduce((a, b) => a + b, 0)).toLocaleString('pt-BR')}</span>
+                    </div>
+                  </td>
+                </tr>
+                <tr className="hover:bg-slate-50/50 transition">
+                  <td className="p-1 sticky left-0 z-20 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 font-bold text-[9px] shadow-sm text-slate-700 dark:text-slate-300">
+                    Saldo Geral
+                  </td>
+                  {Array.from({ length: diasCount }).map((_, d) => {
+                    const count = colaboradores.filter(c => selectedShifts.includes(c.turno) && c.escala[d] === 'WORK').length;
+                    const cap = count * prodRate;
+                    let totalDemand = 0;
+                    selectedShifts.forEach(s => {
+                      totalDemand += (demandaDiaria[s] && demandaDiaria[s][d]) || 0;
+                    });
+                    const diff = cap - totalDemand;
+                    const isSun = d % 7 === 6;
+                    return (
+                      <td
+                        key={d}
+                        className={`p-0.5 text-center text-[9px] font-black ${
+                          isSun 
+                            ? 'border-r-2 border-slate-300 dark:border-slate-700' 
+                            : 'border-r border-slate-200 dark:border-slate-800'
+                        } ${diff >= 0 ? 'text-emerald-600 dark:text-emerald-455' : 'text-red-555 dark:text-red-455'}`}
+                      >
+                        {diff > 0 ? `+${diff}` : diff}
+                      </td>
+                    );
+                  })}
+                  {/* Summary Cell */}
+                  <td className="p-0.5 text-center text-[9px] font-bold bg-slate-50/40 dark:bg-slate-900/20 border-l border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300">
+                    <div className="flex flex-col items-center">
+                      {(() => {
+                        const totalCap = Array.from({ length: diasCount }).map((_, d) => colaboradores.filter(c => selectedShifts.includes(c.turno) && c.escala[d] === 'WORK').length * prodRate).reduce((a, b) => a + b, 0);
+                        let grandDemand = 0;
+                        for (let d = 0; d < diasCount; d++) {
+                          selectedShifts.forEach(s => {
+                            grandDemand += (demandaDiaria[s] && demandaDiaria[s][d]) || 0;
+                          });
+                        }
+                        const totalSal = totalCap - grandDemand;
+                        return (
+                          <>
+                            <span className={totalSal >= 0 ? 'text-emerald-600 dark:text-emerald-455' : 'text-red-555 dark:text-red-455'}>
+                              {totalSal > 0 ? `+${totalSal.toLocaleString('pt-BR')}` : totalSal.toLocaleString('pt-BR')}
+                            </span>
+                          </>
+                        );
+                      })()}
+                    </div>
+                  </td>
+                </tr>
+                {/* HC +/- Row */}
+                <tr className="bg-slate-50/20 dark:bg-slate-900/20 font-black border-b border-slate-300 dark:border-slate-700 transition">
+                  <td className="p-1 sticky left-0 z-20 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 font-bold text-[9px] shadow-sm text-slate-700 dark:text-slate-300">
+                    Hc +/- Geral
+                  </td>
+                  {Array.from({ length: diasCount }).map((_, d) => {
+                    const count = colaboradores.filter(c => selectedShifts.includes(c.turno) && c.escala[d] === 'WORK').length;
+                    const cap = count * prodRate;
+                    let totalDemand = 0;
+                    selectedShifts.forEach(s => {
+                      totalDemand += (demandaDiaria[s] && demandaDiaria[s][d]) || 0;
+                    });
+                    const diff = cap - totalDemand;
+                    const hcDiff = Math.round(diff / prodRate);
+                    const isSun = d % 7 === 6;
+                    return (
+                      <td
+                        key={d}
+                        className={`p-0.5 text-center text-[9px] font-black ${
+                          isSun 
+                            ? 'border-r-2 border-slate-300 dark:border-slate-700 bg-slate-50/50' 
+                            : 'border-r border-slate-200 dark:border-slate-800 bg-slate-50/50'
+                        } ${hcDiff >= 0 ? 'text-emerald-600 dark:text-emerald-455' : 'text-red-555 dark:text-red-455'}`}
+                      >
+                        {hcDiff > 0 ? `+${hcDiff}` : hcDiff}
+                      </td>
+                    );
+                  })}
+                  {/* Summary Cell */}
+                  <td className="p-0.5 text-center text-[9px] font-bold bg-slate-50/40 dark:bg-slate-900/20 border-l border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300">
+                    <div className="flex flex-col items-center">
+                      {(() => {
+                        const totalCap = Array.from({ length: diasCount }).map((_, d) => colaboradores.filter(c => selectedShifts.includes(c.turno) && c.escala[d] === 'WORK').length * prodRate).reduce((a, b) => a + b, 0);
+                        let grandDemand = 0;
+                        for (let d = 0; d < diasCount; d++) {
+                          selectedShifts.forEach(s => {
+                            grandDemand += (demandaDiaria[s] && demandaDiaria[s][d]) || 0;
+                          });
+                        }
+                        const totalSal = totalCap - grandDemand;
+                        const avgHc = Math.round((totalSal / prodRate / diasCount) * 10) / 10;
+                        return (
+                          <>
+                            <span className={avgHc >= 0 ? 'text-emerald-600 dark:text-emerald-455' : 'text-red-555 dark:text-red-455'}>
+                              {avgHc > 0 ? `+${avgHc}` : avgHc}
+                            </span>
+                          </>
+                        );
+                      })()}
+                    </div>
+                  </td>
+                </tr>
+                {/* PMT Row */}
+                <tr className="hover:bg-slate-50/50 transition">
+                  <td className="p-1 sticky left-0 z-20 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 font-bold text-[9px] shadow-sm text-violet-700 dark:text-violet-400">
+                    <div className="flex items-center justify-start gap-0.5 whitespace-nowrap">
+                      <span className="whitespace-nowrap text-[8.5px]">PMT</span>
+                      <button
+                        onClick={() => setIsImportPmtOpen(true)}
+                        className="p-0.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded transition cursor-pointer text-violet-600 dark:text-violet-400"
+                        title="Importar PMT de planilha"
+                      >
+                        <FileSpreadsheet className="w-3 h-3" />
+                      </button>
+                    </div>
+                  </td>
+                  {Array.from({ length: diasCount }).map((_, d) => {
+                    const isSun = d % 7 === 6;
+                    return (
+                      <td
+                        key={d}
+                        className={`p-0 text-center ${isSun ? 'border-r-2 border-slate-300 dark:border-slate-700' : 'border-r border-slate-200 dark:border-slate-800'}`}
+                      >
+                        <input
+                          type="number"
+                          value={pmtData[d]}
+                          onChange={e => {
+                            const val = e.target.value === '' ? 0 : Number(e.target.value);
+                            const next = [...pmtData];
+                            next[d] = val;
+                            if (prodUnit === 'm3') {
+                              updatePmtM3Data(next);
+                            } else {
+                              updatePmtPcsData(next);
+                            }
+                          }}
+                          className="w-full h-full bg-transparent text-center text-[9px] font-black text-slate-700 dark:text-slate-300 outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none focus:bg-violet-50 dark:focus:bg-violet-900/20"
+                        />
+                      </td>
+                    );
+                  })}
+                  {/* Summary Cell */}
+                  <td className="p-0.5 text-center text-[9px] font-bold bg-slate-50/40 dark:bg-slate-900/20 border-l border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300">
+                    <div className="flex flex-col items-center">
+                      <span>{pmtData.reduce((a, b) => a + b, 0).toLocaleString('pt-BR')}</span>
+                    </div>
+                  </td>
+                </tr>
+                </>
+                )}
+              </>
+            )}
 
             {/* Shift Summary Groups */}
             {['T3', 'T1', 'T2'].map((shift) => {
@@ -1164,7 +1426,19 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
                       </tr>
                       <tr className="hover:bg-slate-50/50 transition">
                         <td className="p-1 sticky left-0 z-20 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 font-bold text-[9px] shadow-sm text-slate-700 dark:text-slate-300">
-                          {style.dem}
+                          <div className="flex items-center justify-start gap-0.5 whitespace-nowrap">
+                            <span className="whitespace-nowrap text-[8.5px]">{style.dem}</span>
+                            <button
+                              onClick={() => {
+                                setImportDemandaActiveShift(shift as 'T1' | 'T2' | 'T3');
+                                setIsImportDemandaOpen(true);
+                              }}
+                              className="p-0.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded transition cursor-pointer text-violet-600 dark:text-violet-400"
+                              title={`Importar Demanda para o ${style.dem}`}
+                            >
+                              <FileSpreadsheet className="w-3 h-3" />
+                            </button>
+                          </div>
                         </td>
                         {Array.from({ length: diasCount }).map((_, d) => {
                           const demand = (demandaDiaria[shift] && demandaDiaria[shift][d]) || 0;
@@ -1303,259 +1577,6 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
               );
             })}
 
-            {/* Total Geral Summary Group */}
-            {selectedShifts.length > 1 && (
-              <>
-                {/* Visual Shift Header */}
-                <tr 
-                  onClick={() => toggleSummaryPanel('CONSOLIDADO')}
-                  className="bg-slate-50 dark:bg-slate-955 text-[9px] font-extrabold border-t-2 border-slate-200 dark:border-slate-800 cursor-pointer select-none"
-                >
-                  <td colSpan={diasCount + 2} className="p-1.5 px-3 text-white bg-slate-700 dark:bg-slate-800 border-l-4 border-slate-800 shadow-sm animate-none">
-                    <span className="sticky left-3 z-10 flex items-center gap-1.5">
-                      {collapsedSummaryPanels.includes('CONSOLIDADO') ? (
-                        <ChevronRight className="w-3.5 h-3.5 text-white" />
-                      ) : (
-                        <ChevronDown className="w-3.5 h-3.5 text-white" />
-                      )}
-                      <span>CONSOLIDADO GERAL (TODOS OS TURNOS)</span>
-                    </span>
-                  </td>
-                </tr>
-                {!collapsedSummaryPanels.includes('CONSOLIDADO') && (
-                <>
-                <tr className="hover:bg-slate-50/50 transition">
-                  <td className="p-1 sticky left-0 z-20 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 font-bold text-[9px] shadow-sm text-slate-700 dark:text-slate-300">
-                    Ativos Geral
-                  </td>
-                  {Array.from({ length: diasCount }).map((_, d) => {
-                    const count = colaboradores.filter(c => selectedShifts.includes(c.turno) && c.escala[d] === 'WORK').length;
-                    const isSun = d % 7 === 6;
-                    return (
-                      <td
-                        key={d}
-                        className={`p-0.5 text-center text-[9px] font-black text-slate-700 dark:text-slate-300 ${
-                          isSun 
-                            ? 'border-r-2 border-slate-300 dark:border-slate-700' 
-                            : 'border-r border-slate-200 dark:border-slate-800'
-                        }`}
-                      >
-                        {count}
-                      </td>
-                    );
-                  })}
-                  {/* Summary Cell */}
-                  <td className="p-0.5 text-center text-[9px] font-bold bg-slate-50/40 dark:bg-slate-900/20 border-l border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300">
-                    <div className="flex flex-col items-center">
-                      <span>{Math.round(Array.from({ length: diasCount }).map((_, d) => colaboradores.filter(c => selectedShifts.includes(c.turno) && c.escala[d] === 'WORK').length).reduce((a, b) => a + b, 0) / diasCount)}</span>
-                      <span className="text-[6.5px] text-slate-400 font-normal">Média</span>
-                    </div>
-                  </td>
-                </tr>
-                <tr className="hover:bg-slate-50/50 transition">
-                  <td className="p-1 sticky left-0 z-20 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 font-bold text-[9px] shadow-sm text-slate-700 dark:text-slate-300">
-                    Capac. Geral
-                  </td>
-                  {Array.from({ length: diasCount }).map((_, d) => {
-                    const count = colaboradores.filter(c => selectedShifts.includes(c.turno) && c.escala[d] === 'WORK').length;
-                    const cap = count * prodRate;
-                    const isSun = d % 7 === 6;
-                    return (
-                      <td
-                        key={d}
-                        className={`p-0.5 text-center text-[9px] font-black text-blue-600 dark:text-blue-400 ${
-                          isSun 
-                            ? 'border-r-2 border-slate-300 dark:border-slate-700' 
-                            : 'border-r border-slate-200 dark:border-slate-800'
-                        }`}
-                      >
-                        {cap.toLocaleString('pt-BR')}
-                      </td>
-                    );
-                  })}
-                  {/* Summary Cell */}
-                  <td className="p-0.5 text-center text-[9px] font-bold bg-slate-50/40 dark:bg-slate-900/20 border-l border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300">
-                    <div className="flex flex-col items-center">
-                      <span>{Array.from({ length: diasCount }).map((_, d) => colaboradores.filter(c => selectedShifts.includes(c.turno) && c.escala[d] === 'WORK').length * prodRate).reduce((a, b) => a + b, 0).toLocaleString('pt-BR')}</span>
-                      <span className="text-[6.5px] text-slate-400 font-normal">TT</span>
-                    </div>
-                  </td>
-                </tr>
-                <tr className="hover:bg-slate-50/50 transition">
-                  <td className="p-1 sticky left-0 z-20 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 font-bold text-[9px] shadow-sm text-slate-700 dark:text-slate-300">
-                    Demand. Geral
-                  </td>
-                  {Array.from({ length: diasCount }).map((_, d) => {
-                    let totalDemand = 0;
-                    selectedShifts.forEach(s => {
-                      totalDemand += (demandaDiaria[s] && demandaDiaria[s][d]) || 0;
-                    });
-                    const isSun = d % 7 === 6;
-                    return (
-                      <td
-                        key={d}
-                        className={`p-0.5 text-center text-[9px] font-black text-slate-700 dark:text-slate-300 ${
-                          isSun 
-                            ? 'border-r-2 border-slate-300 dark:border-slate-700' 
-                            : 'border-r border-slate-200 dark:border-slate-800'
-                        }`}
-                      >
-                        {totalDemand}
-                      </td>
-                    );
-                  })}
-                  <td className="p-0.5 text-center text-[9px] font-bold bg-slate-50/40 dark:bg-slate-900/20 border-l border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300">
-                    <div className="flex flex-col items-center">
-                      <span>{(Array.from({ length: diasCount }).map((_, d) => selectedShifts.reduce((acc, s) => acc + ((demandaDiaria[s] && demandaDiaria[s][d]) || 0), 0)).reduce((a, b) => a + b, 0)).toLocaleString('pt-BR')}</span>
-                      <span className="text-[6.5px] text-slate-400 font-normal">TT</span>
-                    </div>
-                  </td>
-                </tr>
-                <tr className="hover:bg-slate-50/50 transition">
-                  <td className="p-1 sticky left-0 z-20 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 font-bold text-[9px] shadow-sm text-slate-700 dark:text-slate-300">
-                    Saldo Geral
-                  </td>
-                  {Array.from({ length: diasCount }).map((_, d) => {
-                    const count = colaboradores.filter(c => selectedShifts.includes(c.turno) && c.escala[d] === 'WORK').length;
-                    const cap = count * prodRate;
-                    let totalDemand = 0;
-                    selectedShifts.forEach(s => {
-                      totalDemand += (demandaDiaria[s] && demandaDiaria[s][d]) || 0;
-                    });
-                    const diff = cap - totalDemand;
-                    const isSun = d % 7 === 6;
-                    return (
-                      <td
-                        key={d}
-                        className={`p-0.5 text-center text-[9px] font-black ${
-                          isSun 
-                            ? 'border-r-2 border-slate-300 dark:border-slate-700' 
-                            : 'border-r border-slate-200 dark:border-slate-800'
-                        } ${diff >= 0 ? 'text-emerald-600 dark:text-emerald-450' : 'text-red-550 dark:text-red-455'}`}
-                      >
-                        {diff > 0 ? `+${diff}` : diff}
-                      </td>
-                    );
-                  })}
-                  {/* Summary Cell */}
-                  <td className="p-0.5 text-center text-[9px] font-bold bg-slate-50/40 dark:bg-slate-900/20 border-l border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300">
-                    <div className="flex flex-col items-center">
-                      {(() => {
-                        const totalCap = Array.from({ length: diasCount }).map((_, d) => colaboradores.filter(c => selectedShifts.includes(c.turno) && c.escala[d] === 'WORK').length * prodRate).reduce((a, b) => a + b, 0);
-                        let grandDemand = 0;
-                        for (let d = 0; d < diasCount; d++) {
-                          selectedShifts.forEach(s => {
-                            grandDemand += (demandaDiaria[s] && demandaDiaria[s][d]) || 0;
-                          });
-                        }
-                        const totalSal = totalCap - grandDemand;
-                        return (
-                          <>
-                            <span className={totalSal >= 0 ? 'text-emerald-600 dark:text-emerald-450' : 'text-red-550 dark:text-red-455'}>
-                              {totalSal > 0 ? `+${totalSal.toLocaleString('pt-BR')}` : totalSal.toLocaleString('pt-BR')}
-                            </span>
-                            <span className="text-[6.5px] text-slate-400 font-normal">SL TT</span>
-                          </>
-                        );
-                      })()}
-                    </div>
-                  </td>
-                </tr>
-                {/* HC +/- Row */}
-                <tr className="bg-slate-50/20 dark:bg-slate-900/20 font-black border-b border-slate-300 dark:border-slate-700 transition">
-                  <td className="p-1 sticky left-0 z-20 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 font-bold text-[9px] shadow-sm text-slate-700 dark:text-slate-300">
-                    Hc +/- Geral
-                  </td>
-                  {Array.from({ length: diasCount }).map((_, d) => {
-                    const count = colaboradores.filter(c => selectedShifts.includes(c.turno) && c.escala[d] === 'WORK').length;
-                    const cap = count * prodRate;
-                    let totalDemand = 0;
-                    selectedShifts.forEach(s => {
-                      totalDemand += (demandaDiaria[s] && demandaDiaria[s][d]) || 0;
-                    });
-                    const diff = cap - totalDemand;
-                    const hcDiff = Math.round(diff / prodRate);
-                    const isSun = d % 7 === 6;
-                    return (
-                      <td
-                        key={d}
-                        className={`p-0.5 text-center text-[9px] font-black ${
-                          isSun 
-                            ? 'border-r-2 border-slate-300 dark:border-slate-700 bg-slate-50/50' 
-                            : 'border-r border-slate-200 dark:border-slate-800 bg-slate-50/50'
-                        } ${hcDiff >= 0 ? 'text-emerald-600 dark:text-emerald-450' : 'text-red-550 dark:text-red-455'}`}
-                      >
-                        {hcDiff > 0 ? `+${hcDiff}` : hcDiff}
-                      </td>
-                    );
-                  })}
-                  {/* Summary Cell */}
-                  <td className="p-0.5 text-center text-[9px] font-bold bg-slate-50/40 dark:bg-slate-900/20 border-l border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300">
-                    <div className="flex flex-col items-center">
-                      {(() => {
-                        const totalCap = Array.from({ length: diasCount }).map((_, d) => colaboradores.filter(c => selectedShifts.includes(c.turno) && c.escala[d] === 'WORK').length * prodRate).reduce((a, b) => a + b, 0);
-                        let grandDemand = 0;
-                        for (let d = 0; d < diasCount; d++) {
-                          selectedShifts.forEach(s => {
-                            grandDemand += (demandaDiaria[s] && demandaDiaria[s][d]) || 0;
-                          });
-                        }
-                        const totalSal = totalCap - grandDemand;
-                        const avgHc = Math.round((totalSal / prodRate / diasCount) * 10) / 10;
-                        return (
-                          <>
-                            <span className={avgHc >= 0 ? 'text-emerald-600 dark:text-emerald-450' : 'text-red-550 dark:text-red-455'}>
-                              {avgHc > 0 ? `+${avgHc}` : avgHc}
-                            </span>
-                            <span className="text-[6.5px] text-slate-400 font-normal">Média</span>
-                          </>
-                        );
-                      })()}
-                    </div>
-                  </td>
-                </tr>
-                {/* PMT Row */}
-                <tr className="hover:bg-slate-50/50 transition">
-                  <td className="p-1 sticky left-0 z-20 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 font-bold text-[9px] shadow-sm text-violet-700 dark:text-violet-400">
-                    PMT
-                  </td>
-                  {Array.from({ length: diasCount }).map((_, d) => {
-                    const isSun = d % 7 === 6;
-                    return (
-                      <td
-                        key={d}
-                        className={`p-0 text-center ${isSun ? 'border-r-2 border-slate-300 dark:border-slate-700' : 'border-r border-slate-200 dark:border-slate-800'}`}
-                      >
-                        <input
-                          type="number"
-                          value={pmtData[d]}
-                          onChange={e => {
-                            const val = e.target.value === '' ? 0 : Number(e.target.value);
-                            const next = [...pmtData];
-                            next[d] = val;
-                            if (prodUnit === 'm3') {
-                              updatePmtM3Data(next);
-                            } else {
-                              updatePmtPcsData(next);
-                            }
-                          }}
-                          className="w-full h-full bg-transparent text-center text-[9px] font-black text-slate-700 dark:text-slate-300 outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none focus:bg-violet-50 dark:focus:bg-violet-900/20"
-                        />
-                      </td>
-                    );
-                  })}
-                  {/* Summary Cell */}
-                  <td className="p-0.5 text-center text-[9px] font-bold bg-slate-50/40 dark:bg-slate-900/20 border-l border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300">
-                    <div className="flex flex-col items-center">
-                      <span>{pmtData.reduce((a, b) => a + b, 0).toLocaleString('pt-BR')}</span>
-                      <span className="text-[6.5px] text-slate-400 font-normal">TT</span>
-                    </div>
-                  </td>
-                </tr>
-                </>
-                )}
-              </>
-            )}
           </tbody>
         </table>
       </div>
@@ -1573,6 +1594,46 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
         onClose={() => setShowTeamManager(false)}
       />
     )}
+
+    {/* Import PMT Modal */}
+    <ImportPmtModal
+      isOpen={isImportPmtOpen}
+      onClose={() => setIsImportPmtOpen(false)}
+      diasCount={diasCount}
+      onApplyPmt={(newM3, newPcs) => {
+        updatePmtM3Data(newM3);
+        updatePmtPcsData(newPcs);
+      }}
+    />
+
+    {/* Import Demanda Modal */}
+    <ImportDemandaModal
+      isOpen={isImportDemandaOpen}
+      onClose={() => setIsImportDemandaOpen(false)}
+      diasCount={diasCount}
+      defaultShift={importDemandaActiveShift}
+      onApplyDemanda={(shift, newM3, newPcs) => {
+        if (prodUnit === 'm3') {
+          const updatedM3 = { ...editingDemandaM3, [shift]: newM3 };
+          setEditingDemandaM3(updatedM3);
+          onDemandaChangeM3?.(updatedM3);
+        } else {
+          const updatedPcs = { ...editingDemandaPcs, [shift]: newPcs };
+          setEditingDemandaPcs(updatedPcs);
+          onDemandaChangePcs?.(updatedPcs);
+        }
+        
+        // Let's also update both behind the scenes so the database stores both
+        if (onDemandaChangeM3 && onDemandaChangePcs) {
+          const updatedM3 = { ...editingDemandaM3, [shift]: newM3 };
+          const updatedPcs = { ...editingDemandaPcs, [shift]: newPcs };
+          setEditingDemandaM3(updatedM3);
+          setEditingDemandaPcs(updatedPcs);
+          onDemandaChangeM3(updatedM3);
+          onDemandaChangePcs(updatedPcs);
+        }
+      }}
+    />
     </React.Fragment>
   );
 };
