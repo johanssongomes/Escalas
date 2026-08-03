@@ -170,7 +170,7 @@ export const ProductivitySimulator: React.FC<ProductivitySimulatorProps> = ({
             <input
               type="number"
               value={prodRate}
-              onChange={(e) => setProdRate(Math.max(1, Number(e.target.value)))}
+              onChange={(e) => setProdRate(Math.max(1, parseInt(e.target.value) || 0))}
               className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 font-bold text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-600"
             />
             <span className="text-sm font-black text-slate-500 dark:text-slate-400">m³/dia</span>
