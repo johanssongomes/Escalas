@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { listScenarios, createScenario, deleteScenario, getScenario, updateScenario, type ScenarioSummary } from '../../utils/apiClient';
-import { Save, FolderOpen, Trash2, X, Check, CheckCircle2, AlertCircle, RefreshCw } from 'lucide-react';
+import { Save, FolderOpen, Trash2, X, Check, CheckCircle2, AlertCircle, RefreshCw, Copy } from 'lucide-react';
 
 import type { DadosMensais } from '../../types';
 
@@ -123,6 +123,32 @@ export function ScenarioManager({
         : `Erro ao excluir: ${err instanceof Error ? err.message : 'Erro desconhecido'}`;
       setLoadError(msg);
       console.error('Erro ao deletar cenário:', err);
+    }
+  };
+
+  const handleDuplicate = async (id: number) => {
+    setLoading(true);
+    setLoadError(null);
+    try {
+      const original = await getScenario(id);
+      await createScenario({
+        name: `${original.name} (Cópia)`,
+        teams: original.teams,
+        params: original.params,
+        dados_mensais: original.dados_mensais as any,
+        prod_rate_m3: original.prod_rate_m3 ?? undefined,
+        prod_rate_pcs: original.prod_rate_pcs ?? undefined,
+        prod_unit: original.prod_unit ?? undefined,
+      });
+      await loadList();
+    } catch (err) {
+      const msg = err instanceof TypeError && err.message === 'Failed to fetch'
+        ? 'Servidor offline. Não foi possível duplicar.'
+        : `Erro ao duplicar: ${err instanceof Error ? err.message : 'Erro desconhecido'}`;
+      setLoadError(msg);
+      console.error('Erro ao duplicar cenário:', err);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -347,6 +373,14 @@ export function ScenarioManager({
                         title={isActive ? 'Recarregar' : 'Carregar'}
                       >
                         {isActive ? <CheckCircle2 className="w-3.5 h-3.5" /> : <FolderOpen className="w-3.5 h-3.5" />}
+                      </button>
+                      <button
+                        onClick={() => handleDuplicate(s.id)}
+                        disabled={loading}
+                        className="p-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-white transition cursor-pointer disabled:opacity-50"
+                        title="Duplicar Cenário"
+                      >
+                        <Copy className="w-3.5 h-3.5" />
                       </button>
                       <button
                         onClick={() => handleDelete(s.id)}

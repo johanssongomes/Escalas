@@ -2,7 +2,8 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { ParametersForm } from './components/Schedule/ParametersForm';
 import { CalendarGrid } from './components/Schedule/CalendarGrid';
 import { generateSchedule } from './utils/scheduleEngine';
-import type { ScheduleParams, Colaborador, TeamConfig, DayStatus, ShiftType, DadosMes, DadosMensais } from './types';
+import { generateIntelligentScale, buildCanonicalTeams, DEFAULT_OPERATION, getMonthInfo, letterFromName, TEAM_LETTERS } from './utils/escala52Engine';
+import type { ScheduleParams, Colaborador, TeamConfig, DayStatus, ShiftType, DadosMes, DadosMensais, OperationConfig, TeamLetter } from './types';
 import { ShieldCheck, Truck, Moon, Sun, Calendar, BarChart3, Upload } from 'lucide-react';
 import { ImportModal } from './components/Schedule/ImportModal';
 
@@ -75,9 +76,9 @@ function App() {
   const [params, setParams] = useState<ScheduleParams>(() => {
     const today = new Date();
     return {
-      conferentesT1: 22,
+      conferentesT1: 14,
       conferentesT2: 10,
-      conferentesT3: 12,
+      conferentesT3: 16,
       weeks: 4,
       dias: 28,
       escala: '5x2',
@@ -88,8 +89,39 @@ function App() {
       setor: 'comercio',
       month: today.getMonth(),
       year: today.getFullYear(),
+      operation: DEFAULT_OPERATION,
+      maxConsecutiveWorkDays: 6,
+      rotationSequence: 'A',
     };
   });
+
+  const handleOperationChange = (newOp: OperationConfig) => {
+    const t1Count = newOp.shifts.T1?.memberCount ?? params.conferentesT1;
+    const t2Count = newOp.shifts.T2?.memberCount ?? params.conferentesT2;
+    const t3Count = newOp.shifts.T3?.memberCount ?? params.conferentesT3;
+    const newTeams = buildCanonicalTeams(newOp);
+    const newProdRate = newOp.prodRate;
+    const newUnit = newOp.unit;
+
+    setTeams(newTeams);
+    if (newUnit === 'm3') setProdRateM3(newProdRate);
+    else setProdRatePcs(newProdRate);
+    setProdUnit(newUnit);
+
+    const updatedParams = {
+      ...params,
+      conferentesT1: t1Count,
+      conferentesT2: t2Count,
+      conferentesT3: t3Count,
+      operation: newOp,
+    };
+    setParams(updatedParams);
+    setIsScenarioDirty(true);
+
+    const scaleResult = generateIntelligentScale(newOp, newTeams, colaboradores, params.month ?? 0, params.year ?? 2026, undefined, params.maxConsecutiveWorkDays, params.rotationSequence);
+    setColaboradores(scaleResult.colaboradores);
+    setTeams(scaleResult.teams);
+  };
 
   const [colaboradores, setColaboradores] = useState<Colaborador[]>([]);
 
@@ -115,67 +147,11 @@ function App() {
   const prodUnitRef = useRef(prodUnit);
   prodUnitRef.current = prodUnit;
 
-  // Distribute collaborators to teams based on the configured memberCount
-  const applyTeamsToColaboradores = (colabs: Colaborador[], newTeams: TeamConfig[], startDay: number, dias: number): Colaborador[] => {
-    const result = [...colabs];
-    const shifts = ['T1', 'T2', 'T3'] as const;
-
-    for (const shift of shifts) {
-      const shiftColabs = result.filter(c => c.turno === shift);
-      const shiftTeams = newTeams.filter(t => t.shiftType === shift);
-
-      let cursor = 0;
-      for (const team of shiftTeams) {
-        const countToAssign = team.memberCount;
-        for (let i = 0; i < countToAssign && cursor < shiftColabs.length; i++) {
-          const colab = shiftColabs[cursor];
-          const pat = team.offPattern;
-
-          const escala = Array.from({ length: dias }, (_, d) => {
-            const dw = (startDay + d) % 7;
-            if (Array.isArray(pat)) {
-              return (dw === pat[0] || dw === pat[1]) ? 'OFF' : 'WORK';
-            }
-            const isOff = pat === 4 ? (dw === 4 || dw === 5) :
-                          pat === 5 ? (dw === 5 || dw === 6) :
-                          (dw === 6 || dw === 0);
-            return isOff ? 'OFF' : 'WORK';
-          }) as Colaborador['escala'];
-
-          const colabIdx = result.findIndex(c => c.id === colab.id);
-          if (colabIdx !== -1) {
-            result[colabIdx] = {
-              ...result[colabIdx],
-              team: team.name,
-              escala
-            };
-          }
-          cursor++;
-        }
-      }
-
-      while (cursor < shiftColabs.length) {
-        const colab = shiftColabs[cursor];
-        const colabIdx = result.findIndex(c => c.id === colab.id);
-        if (colabIdx !== -1) {
-          result[colabIdx] = {
-            ...result[colabIdx],
-            team: undefined,
-            escala: Array(dias).fill('WORK' as DayStatus)
-          };
-        }
-        cursor++;
-      }
-    }
-
-    return result;
-  };
-
   // Get the current month key and data from dadosMensais
   const currentKey = (params.month !== undefined && params.year !== undefined)
     ? mesKey(params.month, params.year) : '';
-  const diasNum = (params.month !== undefined && params.year !== undefined)
-    ? new Date(params.year, params.month + 1, 0).getDate()
+  const diasNum = (params.month !== undefined && params.month !== -1 && params.year !== undefined)
+    ? getMonthInfo(params.year, params.month).dias
     : params.dias;
 
   const dadosMes = currentKey
@@ -197,7 +173,7 @@ function App() {
         next[currentKeyLocal] = dadosMes;
         // Ensure target month has an entry
         if (!next[targetKey]) {
-          const targetDays = new Date(resolved.year!, resolved.month! + 1, 0).getDate();
+          const targetDays = getMonthInfo(resolved.year!, resolved.month!).dias;
           next[targetKey] = criarDadosMes(targetDays);
         }
         return next;
@@ -215,13 +191,6 @@ function App() {
       const monthSpecificTeams = targetDadosMes?.teams ?? teams;
       setTeams(monthSpecificTeams);
 
-      const startDay = (resolved.month !== undefined && resolved.year !== undefined)
-        ? (new Date(resolved.year, resolved.month, 1).getDay() + 6) % 7
-        : 0;
-      const dias = (resolved.month !== undefined && resolved.year !== undefined)
-        ? new Date(resolved.year, resolved.month + 1, 0).getDate()
-        : params.dias;
-
       // 1. If this month has no saved collaborators, auto-generate them from current teams/params
       if (existingColabs.length === 0 && monthSpecificTeams.length > 0) {
         const scale = generateSchedule(resolved).map(c => ({
@@ -229,11 +198,15 @@ function App() {
           team: undefined,
           escala: Array(c.escala.length).fill('WORK' as DayStatus),
         }));
-        existingColabs = applyTeamsToColaboradores(scale, monthSpecificTeams, startDay, dias).filter(c => c.team !== undefined);
+        const op = resolved.operation ?? params.operation ?? DEFAULT_OPERATION;
+        const genRes = generateIntelligentScale(op, monthSpecificTeams, scale, resolved.month!, resolved.year!, undefined, resolved.maxConsecutiveWorkDays, resolved.rotationSequence);
+        existingColabs = genRes.colaboradores.filter(c => c.team !== undefined);
       }
       // 2. If they exist but somehow lost their team names (e.g. older migration/reset), restore team names
       else if (existingColabs.length > 0 && monthSpecificTeams.length > 0 && existingColabs.every(c => !c.team)) {
-        existingColabs = applyTeamsToColaboradores(existingColabs, monthSpecificTeams, startDay, dias);
+        const op = resolved.operation ?? params.operation ?? DEFAULT_OPERATION;
+        const genRes = generateIntelligentScale(op, monthSpecificTeams, existingColabs, resolved.month!, resolved.year!, undefined, resolved.maxConsecutiveWorkDays, resolved.rotationSequence);
+        existingColabs = genRes.colaboradores;
       }
 
       setColaboradores(existingColabs);
@@ -251,7 +224,7 @@ function App() {
       // Make sure the month we are leaving also preserves its teams in dadosMensais
       tempNext[currentKeyLocal] = { ...dadosMes, teams: teams };
       if (!tempNext[targetKey]) {
-        const targetDays = new Date(resolved.year!, resolved.month! + 1, 0).getDate();
+        const targetDays = getMonthInfo(resolved.year!, resolved.month!).dias;
         tempNext[targetKey] = { ...criarDadosMes(targetDays), teams: monthSpecificTeams };
       } else if (!tempNext[targetKey].teams) {
         tempNext[targetKey].teams = monthSpecificTeams;
@@ -456,6 +429,43 @@ function App() {
     }
   }, [dbLoading]);
 
+  // Keep operation.teamSizes in sync with teams state automatically
+  useEffect(() => {
+    const op = params.operation ?? DEFAULT_OPERATION;
+    const currentTeamSizes = op.teamSizes;
+    const expectedTeamSizes: Record<ShiftType, Record<TeamLetter, number>> = {
+      T1: { A: 0, B: 0, C: 0, D: 0, E: 0, F: 0, G: 0, H: 0, I: 0, J: 0 },
+      T2: { A: 0, B: 0, C: 0, D: 0, E: 0, F: 0, G: 0, H: 0, I: 0, J: 0 },
+      T3: { A: 0, B: 0, C: 0, D: 0, E: 0, F: 0, G: 0, H: 0, I: 0, J: 0 },
+    };
+    teams.forEach(t => {
+      const letter = letterFromName(t.name);
+      if (expectedTeamSizes[t.shiftType] && letter in expectedTeamSizes[t.shiftType]) {
+        expectedTeamSizes[t.shiftType][letter] = t.memberCount;
+      }
+    });
+
+    let hasDiff = false;
+    for (const shift of ['T1', 'T2', 'T3'] as ShiftType[]) {
+      for (const letter of TEAM_LETTERS) {
+        if ((currentTeamSizes[shift]?.[letter] ?? 0) !== (expectedTeamSizes[shift]?.[letter] ?? 0)) {
+          hasDiff = true;
+          break;
+        }
+      }
+    }
+
+    if (hasDiff) {
+      setParams(prev => ({
+        ...prev,
+        operation: {
+          ...(prev.operation ?? DEFAULT_OPERATION),
+          teamSizes: expectedTeamSizes
+        }
+      }));
+    }
+  }, [teams, params.operation]);
+
   // Refs for latest prod rate inside async callbacks
   const paramsRef = useRef(params);
   paramsRef.current = params;
@@ -515,7 +525,7 @@ function App() {
     const currentYear = params.year;
     const currentDbKey = (currentMonth !== undefined && currentYear !== undefined) ? mesKey(currentMonth, currentYear) : '';
     const currentDays = (currentMonth !== undefined && currentYear !== undefined)
-      ? new Date(currentYear, currentMonth + 1, 0).getDate()
+      ? getMonthInfo(currentYear, currentMonth).dias
       : params.dias;
 
     // Merge dados_mensais from scenario
@@ -574,18 +584,15 @@ function App() {
         setColaboradores(filtered);
         setIsManualMode(true);
       } else {
-        const startDay = (currentMonth !== undefined && currentYear !== undefined)
-          ? (new Date(currentYear!, currentMonth!, 1).getDay() + 6) % 7
-          : 0;
-        const dias = currentDays;
         if (data.teams && data.teams.length > 0) {
           const scale = generateSchedule(data.params).map(c => ({
             ...c,
             team: undefined,
-            escala: Array(dias).fill('WORK' as DayStatus),
+            escala: Array(diasNum).fill('WORK' as DayStatus),
           }));
-          const applied = applyTeamsToColaboradores(scale, data.teams, startDay, dias);
-          const kept = applied.filter(c => c.team !== undefined);
+          const op = data.params?.operation ?? params.operation ?? DEFAULT_OPERATION;
+          const genRes = generateIntelligentScale(op, data.teams, scale, currentMonth ?? 0, currentYear ?? 2026);
+          const kept = genRes.colaboradores.filter(c => c.team !== undefined);
           setColaboradores(kept);
           setIsManualMode(true);
         }
@@ -621,13 +628,6 @@ function App() {
       delete updatedMesesData[currentKey];
       setParams(prev => ({ ...prev, meses_data: updatedMesesData }));
     } else {
-      const startDay = (params.month !== undefined && params.year !== undefined)
-        ? (new Date(params.year, params.month, 1).getDay() + 6) % 7
-        : 0;
-      const dias = (params.month !== undefined && params.year !== undefined)
-        ? new Date(params.year, params.month + 1, 0).getDate()
-        : params.dias;
-
       let colabs = [...colaboradores];
       colabs = colabs.filter(c => shiftsWithTeams.has(c.turno));
 
@@ -643,14 +643,28 @@ function App() {
             colabs.push({
               id: `${shift}-${String(nextNum).padStart(3, '0')}`,
               turno: shift,
-              escala: Array(dias).fill('WORK' as DayStatus),
+              escala: Array(diasNum).fill('WORK' as DayStatus),
             });
           }
         }
       }
+      const op = params.operation ?? DEFAULT_OPERATION;
+      // Rebuild teamSizes matching newTeams
+      const newTeamSizes: Record<ShiftType, Record<TeamLetter, number>> = {
+        T1: { A: 0, B: 0, C: 0, D: 0 },
+        T2: { A: 0, B: 0, C: 0, D: 0 },
+        T3: { A: 0, B: 0, C: 0, D: 0 },
+      };
+      newTeams.forEach(t => {
+        const letter = letterFromName(t.name);
+        if (newTeamSizes[t.shiftType] && letter in newTeamSizes[t.shiftType]) {
+          newTeamSizes[t.shiftType][letter] = t.memberCount;
+        }
+      });
+      const updatedOp = { ...op, teamSizes: newTeamSizes };
 
-      const updated = applyTeamsToColaboradores(colabs, newTeams, startDay, dias);
-      const kept = updated.filter(c => c.team !== undefined);
+      const genRes = generateIntelligentScale(updatedOp, newTeams, colabs, params.month ?? 0, params.year ?? 2026, undefined, params.maxConsecutiveWorkDays, params.rotationSequence);
+      const kept = genRes.colaboradores.filter(c => c.team !== undefined);
       setColaboradores(kept);
       setIsManualMode(true);
 
@@ -660,8 +674,7 @@ function App() {
       } else {
         delete updatedMesesData[currentKey];
       }
-
-      setParams(prev => ({ ...prev, meses_data: updatedMesesData }));
+      setParams(prev => ({ ...prev, operation: updatedOp, meses_data: updatedMesesData }));
     }
   };
 
@@ -694,16 +707,31 @@ function App() {
       team: undefined,
       escala: Array(c.escala.length).fill('WORK' as DayStatus),
     }));
-    const startDay = (params.month !== undefined && params.year !== undefined)
-      ? (new Date(params.year, params.month, 1).getDay() + 6) % 7
-      : 0;
-    const dias = (params.month !== undefined && params.year !== undefined)
-      ? new Date(params.year, params.month + 1, 0).getDate()
-      : params.dias;
-    const applied = applyTeamsToColaboradores(scale, teams, startDay, dias);
-    const kept = applied.filter(c => c.team !== undefined);
+    const op = params.operation ?? DEFAULT_OPERATION;
+    const genRes = generateIntelligentScale(op, teams, scale, params.month ?? 0, params.year ?? 2026, undefined, params.maxConsecutiveWorkDays, params.rotationSequence);
+    const kept = genRes.colaboradores.filter(c => c.team !== undefined);
     setColaboradores(kept);
   };
+
+  // Automatically regenerate scale if maxConsecutiveWorkDays or rotationSequence changes
+  useEffect(() => {
+    if (isInitialLoadDone && colaboradoresRef.current.length > 0 && teamsRef.current.length > 0) {
+      const op = params.operation ?? DEFAULT_OPERATION;
+      const result = generateIntelligentScale(
+        op,
+        teamsRef.current,
+        colaboradoresRef.current,
+        params.month ?? 0,
+        params.year ?? 2026,
+        undefined,
+        params.maxConsecutiveWorkDays,
+        params.rotationSequence
+      );
+      setColaboradores(result.colaboradores);
+      setTeams(result.teams);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [params.maxConsecutiveWorkDays, params.rotationSequence, isInitialLoadDone, params.month, params.year, params.operation]);
 
   // Run on initial mount or parameters change (only if not in manual mode)
   useEffect(() => {
@@ -719,7 +747,7 @@ function App() {
   }, [
     params.conferentesT1, params.conferentesT2, params.conferentesT3,
     params.dias, params.horasSemanais, params.cenario, params.escala,
-    params.setor, params.weeks,
+    params.setor, params.weeks, params.maxConsecutiveWorkDays, params.rotationSequence,
     isManualMode, isInitialLoadDone
   ]);
 
@@ -1043,18 +1071,20 @@ function App() {
               <div className="border-t border-slate-200 dark:border-slate-800/80 my-4 noprint"></div>
 
               {/* Part 2: Interactive Grid */}
-              <CalendarGrid key={`${params.month}_${params.year}`}
-                colaboradores={colaboradores.filter(c => c.team)} 
-                diasCount={diasNum} 
-                month={params.month} 
-                year={params.year} 
-                plain={true} 
-                onUpdateColaboradores={handleColaboradoresChange}
-                isManualMode={isManualMode}
-                onToggleManualMode={setIsManualMode}
-                params={params}
-                teams={teams}
-                onUpdateTeams={handleUpdateTeams}
+               <CalendarGrid key={`${params.month}_${params.year}`}
+                 colaboradores={colaboradores} 
+                 diasCount={diasNum} 
+                 month={params.month} 
+                 year={params.year} 
+                 plain={true} 
+                 onUpdateColaboradores={handleColaboradoresChange}
+                 isManualMode={isManualMode}
+                 onToggleManualMode={setIsManualMode}
+                 params={params}
+                 teams={teams}
+                 operation={params.operation ?? DEFAULT_OPERATION}
+                 onOperationChange={handleOperationChange}
+                 onUpdateTeams={handleUpdateTeams}
                 demandaDiariaM3Prop={dadosMes.demandaM3}
                 demandaDiariaPcsProp={dadosMes.demandaPcs}
                 onDemandaChangeM3={handleDemandaM3Change}

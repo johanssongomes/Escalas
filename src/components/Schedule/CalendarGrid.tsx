@@ -1,10 +1,13 @@
-import React, { useState, useMemo, useEffect } from 'react';
-import type { Colaborador, ScheduleParams, TeamConfig } from '../../types';
-import { Calendar, User, Filter, Layers, ChevronDown, ChevronRight, ChevronsUpDown, Settings2, Calculator, CheckCircle2, FileSpreadsheet } from 'lucide-react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import type { Colaborador, ScheduleParams, TeamConfig, OperationConfig } from '../../types';
+import { Calendar, User, Filter, Layers, ChevronDown, ChevronRight, ChevronsUpDown, Settings2, Calculator, CheckCircle2, FileSpreadsheet, Activity, Gauge } from 'lucide-react';
 import { TeamManagerModal } from './TeamManagerModal';
 import { ScenarioManager } from './ScenarioManager';
 import { ImportPmtModal } from './ImportPmtModal';
 import { ImportDemandaModal } from './ImportDemandaModal';
+import { WfmIntelligencePanel } from './WfmIntelligencePanel';
+import { OperationConfigPanel } from './OperationConfigPanel';
+import { DEFAULT_OPERATION, getOperationalWeekIndex, getDayLabel, getMonthInfo, getMondaysInMonth, computeCapacity, generateIntelligentScale } from '../../utils/escala52Engine';
 
 interface CalendarGridProps {
   colaboradores: Colaborador[];
@@ -36,6 +39,8 @@ interface CalendarGridProps {
   activeScenarioId?: number;
   isScenarioDirty?: boolean;
   onScenarioSaved?: () => void;
+  operation?: OperationConfig;
+  onOperationChange?: (op: OperationConfig) => void;
 }
 
 const WEEKDAYS = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'];
@@ -92,11 +97,74 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
   activeScenarioId,
   isScenarioDirty,
   onScenarioSaved,
+  operation: operationProp,
+  onOperationChange,
 }) => {
-  const startDayOfWeek = (month !== undefined && year !== undefined)
-    ? (new Date(year, month, 1).getDay() + 6) % 7
+  const startDayOfWeek = (month !== undefined && month !== -1 && year !== undefined)
+    ? getMonthInfo(year, month).startDayOfWeek
     : 0;
 
+  const weeksToRender = useMemo(() => {
+    if (month === undefined || month === -1 || year === undefined) {
+      return Array.from({ length: Math.ceil(diasCount / 7) }).map((_, wIdx) => ({
+        weekNum: wIdx + 1,
+        colSpan: Math.min(7, diasCount - wIdx * 7),
+        label: `SEMANA ${wIdx + 1}`,
+      }));
+    }
+
+    const weeks: { weekNum: number; colSpan: number; label: string }[] = [];
+    let currentWeekNum = -999;
+    let currentSpan = 0;
+    let weekStartDay = 1;
+
+    const mondays = getMondaysInMonth(year, month);
+    const firstMonday = mondays && mondays.length > 0 ? mondays[0] : null;
+    if (!firstMonday) {
+      return Array.from({ length: Math.ceil(diasCount / 7) }).map((_, wIdx) => ({
+        weekNum: wIdx + 1,
+        colSpan: Math.min(7, diasCount - wIdx * 7),
+        label: `SEMANA ${wIdx + 1}`,
+      }));
+    }
+    for (let d = 0; d < diasCount; d++) {
+      const currentDate = new Date(firstMonday.getFullYear(), firstMonday.getMonth(), firstMonday.getDate() + d);
+      const wIdx = getOperationalWeekIndex(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate());
+      const wNum = wIdx + 1;
+
+      if (wNum !== currentWeekNum) {
+        if (currentSpan > 0) {
+          const thDate = new Date(Date.UTC(2025, 11, 29 + (currentWeekNum - 1) * 7));
+          const weDate = new Date(Date.UTC(2025, 11, 29 + (currentWeekNum - 1) * 7 + 6));
+          weeks.push({
+            weekNum: currentWeekNum,
+            colSpan: currentSpan,
+            label: `SEMANA ${currentWeekNum} (${String(thDate.getUTCDate()).padStart(2, '0')}/${String(thDate.getUTCMonth() + 1).padStart(2, '0')} A ${String(weDate.getUTCDate()).padStart(2, '0')}/${String(weDate.getUTCMonth() + 1).padStart(2, '0')})`,
+          });
+        }
+        currentWeekNum = wNum;
+        currentSpan = 1;
+        weekStartDay = d + 1;
+      } else {
+        currentSpan++;
+      }
+    }
+
+    if (currentSpan > 0) {
+      const thDate = new Date(Date.UTC(2025, 11, 29 + (currentWeekNum - 1) * 7));
+      const weDate = new Date(Date.UTC(2025, 11, 29 + (currentWeekNum - 1) * 7 + 6));
+      weeks.push({
+        weekNum: currentWeekNum,
+        colSpan: currentSpan,
+        label: `SEMANA ${currentWeekNum} (${String(thDate.getUTCDate()).padStart(2, '0')}/${String(thDate.getUTCMonth() + 1).padStart(2, '0')} A ${String(weDate.getUTCDate()).padStart(2, '0')}/${String(weDate.getUTCMonth() + 1).padStart(2, '0')})`,
+      });
+    }
+
+    return weeks;
+  }, [diasCount, month, year]);
+
+  const operation = operationProp ?? params?.operation ?? DEFAULT_OPERATION;
+  const setOperation = onOperationChange ?? ((_op: OperationConfig) => {});
   const [selectedShifts, setSelectedShifts] = useState<string[]>(['T1', 'T2', 'T3']);
   // State holds view mode: 'grouped' (split by shift-teams) or 'consolidated' (flat list per shift)
   const [viewMode, setViewMode] = useState<'grouped' | 'consolidated'>('grouped');
@@ -104,6 +172,31 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
   const [collapsedGroups, setCollapsedGroups] = useState<string[]>([]);
   // State holds array of collapsed summary panel keys (T1, T2, T3, CONSOLIDADO)
   const [collapsedSummaryPanels, setCollapsedSummaryPanels] = useState<string[]>(['T1', 'T2', 'T3']);
+
+  // Click & Drag range selection states (supports dragging across rows and groups like Excel)
+  const [isDraggingRange, setIsDraggingRange] = useState(false);
+  const [selectionAnchor, setSelectionAnchor] = useState<{ rowIdx: number; colIdx: number; status: any } | null>(null);
+  const [selectionCurrent, setSelectionCurrent] = useState<{ rowIdx: number; colIdx: number } | null>(null);
+  const [dragModifier, setDragModifier] = useState<'copy' | 'clear' | 'fillEmpty' | 'normal'>('normal');
+
+  const handleCellMouseDown = (_colabId: string, rowIdx: number, d: number, status: any, e: React.MouseEvent) => {
+    e.preventDefault();
+    let mod: 'copy' | 'clear' | 'fillEmpty' | 'normal' = 'normal';
+    if (e.altKey) mod = 'clear';
+    else if (e.ctrlKey) mod = 'copy';
+    else if (e.shiftKey) mod = 'fillEmpty';
+
+    setIsDraggingRange(true);
+    setSelectionAnchor({ rowIdx, colIdx: d, status: mod === 'clear' ? 'OFF' : status });
+    setSelectionCurrent({ rowIdx, colIdx: d });
+    setDragModifier(mod);
+  };
+
+  const handleCellMouseEnter = (rowIdx: number, d: number) => {
+    if (isDraggingRange) {
+      setSelectionCurrent({ rowIdx, colIdx: d });
+    }
+  };
 
   const toggleSummaryPanel = (key: string) => {
     if (collapsedSummaryPanels.includes(key)) {
@@ -259,6 +352,15 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
     setSelectedShifts([]);
   };
 
+  const capacity = useMemo(
+    () => computeCapacity({ colaboradores, operation, month: month ?? 0, year: year ?? 2026, demanda: demandaDiaria }),
+    [colaboradores, operation, month, year, demandaDiaria]
+  );
+
+  const monthLabel = month !== undefined && year !== undefined
+    ? `${['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'][month]}/${year}`
+    : '';
+
   const handleDemandaChange = (shift: string, dayIdx: number, val: number) => {
     if (prodUnit === 'm3') {
       const newDemanda = { ...editingDemandaM3 };
@@ -380,11 +482,169 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
     }
   }, [sortedGroups]);
 
+  const renderedColaboradores = useMemo(() => {
+    if (viewMode === 'grouped') {
+      return sortedGroups.flatMap(g => g.members);
+    }
+    return sortedColaboradoresConsolidated;
+  }, [viewMode, sortedGroups, sortedColaboradoresConsolidated]);
+
+  const colabRowIndexMap = useMemo(() => {
+    const map = new Map<string, number>();
+    renderedColaboradores.forEach((c, idx) => map.set(c.id, idx));
+    return map;
+  }, [renderedColaboradores]);
+
+  const handleMouseUp = useCallback(() => {
+    if (isDraggingRange && selectionAnchor && selectionCurrent) {
+      const minRow = Math.min(selectionAnchor.rowIdx, selectionCurrent.rowIdx);
+      const maxRow = Math.max(selectionAnchor.rowIdx, selectionCurrent.rowIdx);
+      const minCol = Math.min(selectionAnchor.colIdx, selectionCurrent.colIdx);
+      const maxCol = Math.max(selectionAnchor.colIdx, selectionCurrent.colIdx);
+
+      const sourceVal = selectionAnchor.status;
+
+      if (onUpdateColaboradores) {
+        const updated = [...colaboradores];
+        
+        for (let r = minRow; r <= maxRow; r++) {
+          const colab = renderedColaboradores[r];
+          if (!colab) continue;
+          const globalIdx = updated.findIndex(c => c.id === colab.id);
+          if (globalIdx !== -1) {
+            const newEscala = [...updated[globalIdx].escala];
+            for (let cCol = minCol; cCol <= maxCol; cCol++) {
+              if (cCol >= 0 && cCol < newEscala.length) {
+                if (dragModifier === 'clear') {
+                  newEscala[cCol] = 'OFF';
+                } else if (dragModifier === 'fillEmpty') {
+                  if (newEscala[cCol] === 'OFF') {
+                    newEscala[cCol] = sourceVal;
+                  }
+                } else {
+                  newEscala[cCol] = sourceVal;
+                }
+              }
+            }
+            updated[globalIdx] = { ...updated[globalIdx], escala: newEscala };
+          }
+        }
+        onUpdateColaboradores(updated);
+      }
+    }
+    setIsDraggingRange(false);
+    setSelectionAnchor(null);
+    setSelectionCurrent(null);
+  }, [isDraggingRange, selectionAnchor, selectionCurrent, dragModifier, colaboradores, renderedColaboradores, onUpdateColaboradores]);
+
+  useEffect(() => {
+    const onGlobalMouseUp = () => {
+      if (isDraggingRange) {
+        handleMouseUp();
+      }
+    };
+    window.addEventListener('mouseup', onGlobalMouseUp);
+    return () => window.removeEventListener('mouseup', onGlobalMouseUp);
+  }, [isDraggingRange, handleMouseUp]);
+
+  const isCellInSelection = (rowIdx: number, d: number) => {
+    if (!isDraggingRange || !selectionAnchor || !selectionCurrent) return false;
+    const minRow = Math.min(selectionAnchor.rowIdx, selectionCurrent.rowIdx);
+    const maxRow = Math.max(selectionAnchor.rowIdx, selectionCurrent.rowIdx);
+    const minCol = Math.min(selectionAnchor.colIdx, selectionCurrent.colIdx);
+    const maxCol = Math.max(selectionAnchor.colIdx, selectionCurrent.colIdx);
+    return rowIdx >= minRow && rowIdx <= maxRow && d >= minCol && d <= maxCol;
+  };
+
+  // Group / Team level drag and drop states and handlers
+  const [isGroupDragging, setIsGroupDragging] = useState(false);
+  const [dragGroupKey, setDragGroupKey] = useState<string | null>(null);
+  const [dragGroupStartDay, setDragGroupStartDay] = useState<number | null>(null);
+  const [dragGroupCurrentDay, setDragGroupCurrentDay] = useState<number | null>(null);
+  const [dragGroupAction, setDragGroupAction] = useState<'WORK' | 'OFF'>('WORK');
+
+  const handleGroupMouseDown = (groupKey: string, d: number, e: React.MouseEvent) => {
+    e.preventDefault();
+    const group = sortedGroups.find(g => g.key === groupKey);
+    if (!group) return;
+    const action: 'WORK' | 'OFF' = e.altKey ? 'OFF' : 'WORK';
+
+    setIsGroupDragging(true);
+    setDragGroupKey(groupKey);
+    setDragGroupStartDay(d);
+    setDragGroupCurrentDay(d);
+    setDragGroupAction(action);
+  };
+
+  const handleGroupMouseEnter = (groupKey: string, d: number) => {
+    if (isGroupDragging && dragGroupKey === groupKey) {
+      setDragGroupCurrentDay(d);
+    }
+  };
+
+  const handleGroupMouseUp = useCallback(() => {
+    if (isGroupDragging && dragGroupKey !== null && dragGroupStartDay !== null && dragGroupCurrentDay !== null) {
+      const minD = Math.min(dragGroupStartDay, dragGroupCurrentDay);
+      const maxD = Math.max(dragGroupStartDay, dragGroupCurrentDay);
+      const group = sortedGroups.find(g => g.key === dragGroupKey);
+
+      if (group && onUpdateColaboradores) {
+        const updated = [...colaboradores];
+        const memberIds = new Set(group.members.map(m => m.id));
+
+        for (let i = 0; i < updated.length; i++) {
+          if (memberIds.has(updated[i].id)) {
+            const newEscala = [...updated[i].escala];
+            for (let d = minD; d <= maxD; d++) {
+              if (d >= 0 && d < newEscala.length) {
+                const dw = (startDayOfWeek + d) % 7;
+                const isRestricted = updated[i].restrictions && (
+                  (updated[i].restrictions?.noSaturdays && dw === 5) ||
+                  (updated[i].restrictions?.noSundays && dw === 6) ||
+                  (updated[i].restrictions?.ferias ?? []).some(r => d >= r.from && d <= r.to) ||
+                  (updated[i].restrictions?.afastamentos ?? []).some(r => d >= r.from && d <= r.to)
+                );
+                if (!isRestricted) {
+                  newEscala[d] = dragGroupAction;
+                }
+              }
+            }
+            updated[i] = { ...updated[i], escala: newEscala };
+          }
+        }
+        onUpdateColaboradores(updated);
+      }
+    }
+    setIsGroupDragging(false);
+    setDragGroupKey(null);
+    setDragGroupStartDay(null);
+    setDragGroupCurrentDay(null);
+  }, [isGroupDragging, dragGroupKey, dragGroupStartDay, dragGroupCurrentDay, dragGroupAction, sortedGroups, colaboradores, onUpdateColaboradores, startDayOfWeek]);
+
+  useEffect(() => {
+    const onGlobalGroupMouseUp = () => {
+      if (isGroupDragging) {
+        handleGroupMouseUp();
+      }
+    };
+    window.addEventListener('mouseup', onGlobalGroupMouseUp);
+    return () => window.removeEventListener('mouseup', onGlobalGroupMouseUp);
+  }, [isGroupDragging, handleGroupMouseUp]);
+
+  const isGroupCellInSelection = (groupKey: string, d: number) => {
+    if (!isGroupDragging || dragGroupKey !== groupKey || dragGroupStartDay === null || dragGroupCurrentDay === null) return false;
+    const minD = Math.min(dragGroupStartDay, dragGroupCurrentDay);
+    const maxD = Math.max(dragGroupStartDay, dragGroupCurrentDay);
+    return d >= minD && d <= maxD;
+  };
+
   // Helper to render employee row
   const renderColaboradorRow = (colab: Colaborador) => {
+    const rowIdx = colabRowIndexMap.get(colab.id) ?? 0;
     const diasTrabalhados = colab.escala.filter(status => status === 'WORK').length;
     const teamInfo = getTeamInfo(colab, teams);
-    const colors = TEAM_COLOR_MAP[teamInfo.colorKey];
+    const shiftColorKey = colab.turno === 'T1' ? 'emerald' : colab.turno === 'T2' ? 'amber' : 'indigo';
+    const colors = TEAM_COLOR_MAP[teamInfo.name === 'Sem Equipe' ? 'gray' : shiftColorKey];
     return (
       <tr key={colab.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition border-b border-slate-100 dark:border-slate-800">
         <td className="p-1 sticky left-0 z-20 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 font-bold text-slate-800 dark:text-slate-200 flex items-center justify-between gap-1 shadow-sm">
@@ -413,11 +673,15 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
           const dayOfWeek = (startDayOfWeek + d) % 7;
           const isSun = dayOfWeek === 6;
           const isSat = dayOfWeek === 5;
+
+          const inSelection = isCellInSelection(rowIdx, d);
           
           return (
             <td
               key={d}
-              className={`p-0.5 text-center ${
+              onMouseDown={(e) => handleCellMouseDown(colab.id, rowIdx, d, status, e)}
+              onMouseEnter={() => handleCellMouseEnter(rowIdx, d)}
+              className={`p-0.5 text-center select-none ${
                 isSun 
                   ? 'bg-slate-50/10 dark:bg-slate-900/5 border-r-2 border-slate-300 dark:border-slate-700' 
                   : isSat 
@@ -425,20 +689,31 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
                     : 'border-r border-slate-200 dark:border-slate-800'
               }`}
             >
-              <div className="flex justify-center">
+              <div className="flex justify-center relative">
                 <span
-                  onClick={() => handleToggleDay(colab.id, d)}
-                  className={`w-[19px] h-[19px] rounded-md flex items-center justify-center font-black text-[9px] transition-all border cursor-pointer hover:scale-110 active:scale-95 select-none ${
+                  onClick={() => {
+                    if (!isDraggingRange) handleToggleDay(colab.id, d);
+                  }}
+                  className={`w-[19px] h-[19px] rounded-md flex items-center justify-center font-black text-[9px] transition-all border ${
+                    isDraggingRange ? 'cursor-grabbing' : 'cursor-pointer hover:scale-110'
+                  } active:scale-95 select-none ${
+                    inSelection ? 'ring-2 ring-blue-500 border-blue-600 opacity-85 shadow-md scale-105' : ''
+                  } ${
                     isWorking
                       ? teamInfo.name === 'Sem Equipe'
                         ? 'bg-slate-300 text-slate-650 border-slate-450 dark:bg-slate-700 dark:text-slate-300 dark:border-slate-600'
-                        : `${TEAM_COLOR_MAP[teamInfo.colorKey].badge} text-white border-slate-800/10`
+                        : `${TEAM_COLOR_MAP[shiftColorKey].badge} text-white border-slate-800/10`
                       : 'bg-slate-100 text-slate-400 border-slate-200/60 dark:bg-slate-900/40 dark:text-slate-600 dark:border-slate-800'
                   }`}
                   title={isWorking ? `Clique para dar Folga ao ${colab.id}` : `Clique para escalar o ${colab.id}`}
                 >
                   {isWorking ? (teamInfo.name === 'Sem Equipe' ? '—' : colab.turno) : 'F'}
                 </span>
+                {inSelection && rowIdx === selectionCurrent?.rowIdx && d === selectionCurrent?.colIdx && (
+                  <div className="absolute -top-7 left-1/2 -translate-x-1/2 z-30 bg-blue-600 text-white text-[8px] font-black px-1.5 py-0.5 rounded shadow-lg whitespace-nowrap pointer-events-none">
+                    {dragModifier === 'clear' ? 'Apagando' : selectionAnchor?.status === 'WORK' ? 'Trabalho' : 'Folga'}
+                  </div>
+                )}
               </div>
             </td>
           );
@@ -475,145 +750,6 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
           </div>
         )}
         
-        <div className="flex flex-wrap items-center gap-4 text-[10px] font-bold">
-          <div className="flex flex-wrap items-center justify-between gap-4 w-full border-b border-slate-100 dark:border-slate-800/40 pb-3 mb-1">
-            <div className="flex flex-wrap items-center gap-4">
-
-              {/* View Mode Toggle */}
-              <div className="flex items-center gap-1.5 bg-slate-50 dark:bg-slate-900/50 px-2 py-1 rounded-xl border border-slate-200/60 dark:border-slate-800">
-                <span className="text-[10px] font-black text-slate-500 flex items-center gap-1 uppercase tracking-wider">
-                  <Layers className="w-3.5 h-3.5 text-slate-400" />
-                  Exibição:
-                </span>
-                <div className="flex bg-slate-200/60 dark:bg-slate-950 p-0.5 rounded-lg border border-slate-250 dark:border-slate-800">
-                  <button
-                    onClick={() => setViewMode('grouped')}
-                    className={`px-2.5 py-0.5 rounded-md text-[9px] font-black transition duration-200 cursor-pointer ${
-                      viewMode === 'grouped'
-                        ? 'bg-slate-600 text-white shadow-sm dark:bg-slate-800'
-                        : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200'
-                    }`}
-                  >
-                    Por Equipes
-                  </button>
-                  <button
-                    onClick={() => setViewMode('consolidated')}
-                    className={`px-2.5 py-0.5 rounded-md text-[9px] font-black transition duration-200 cursor-pointer ${
-                      viewMode === 'consolidated'
-                        ? 'bg-slate-600 text-white shadow-sm dark:bg-slate-800'
-                        : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200'
-                    }`}
-                  >
-                    Consolidado
-                  </button>
-                </div>
-              </div>
-
-              {/* Collapse/Expand Control (Only in Grouped) */}
-              {viewMode === 'grouped' && (
-                <div className="flex items-center gap-1.5 bg-slate-50 dark:bg-slate-900/50 px-2 py-1 rounded-xl border border-slate-200/60 dark:border-slate-800">
-                  <span className="text-[10px] font-black text-slate-500 flex items-center gap-1 uppercase tracking-wider">
-                    <ChevronsUpDown className="w-3.5 h-3.5 text-slate-400" />
-                    Grupos:
-                  </span>
-                  <div className="flex bg-slate-200/60 dark:bg-slate-950 p-0.5 rounded-lg border border-slate-250 dark:border-slate-800">
-                    <button
-                      onClick={expandAll}
-                      className={`px-2 py-0.5 rounded text-[8px] font-black transition cursor-pointer ${
-                        collapsedGroups.length === 0
-                          ? 'bg-slate-400 text-white dark:bg-slate-850'
-                          : 'text-slate-500 hover:text-slate-800 dark:text-slate-400'
-                      }`}
-                    >
-                      Expandir
-                    </button>
-                    <button
-                      onClick={collapseAll}
-                      className={`px-2 py-0.5 rounded text-[8px] font-black transition cursor-pointer ${
-                        collapsedGroups.length === sortedGroups.length
-                          ? 'bg-slate-400 text-white dark:bg-slate-850'
-                          : 'text-slate-500 hover:text-slate-800 dark:text-slate-400'
-                      }`}
-                    >
-                      Recolher
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Gerenciar Equipes Button */}
-            <button
-              onClick={() => setShowTeamManager(true)}
-              className="flex items-center gap-1.5 px-4 py-1.5 rounded-xl text-xs font-black bg-blue-600 hover:bg-blue-700 text-white transition cursor-pointer shadow-md hover:shadow-lg"
-              title="Criar, excluir e distribuir colaboradores entre equipes"
-            >
-              <Settings2 className="w-4 h-4" />
-              Gerenciar Equipes
-            </button>
-
-            <ScenarioManager
-              teams={teams}
-              params={params}
-              colaboradores={colaboradores}
-              dados_mensais={dadosMensais}
-              prod_rate_m3={prodRateM3}
-              prod_rate_pcs={prodRatePcs}
-              prod_unit={prodUnit}
-              activeScenarioName={activeScenarioName}
-              activeScenarioId={activeScenarioId}
-              isScenarioDirty={isScenarioDirty}
-              onScenarioSaved={onScenarioSaved}
-              onLoadScenario={(data) => onLoadScenario?.(data)}
-            />
-          </div>
-
-          {/* Row 2: Filtering and Legend */}
-          <div className="flex flex-wrap items-center justify-between gap-4 w-full pt-1">
-            {/* Shift Filter */}
-            <div className="sticky left-3 z-10 flex items-center gap-2">
-              <span className="text-[10px] font-black text-slate-500 flex items-center gap-1 uppercase tracking-wider">
-                <Filter className="w-3.5 h-3.5 text-slate-400" />
-                Filtrar Turno:
-              </span>
-              <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-900 p-0.5 rounded-xl border border-slate-200/50 dark:border-slate-850">
-                <button
-                  onClick={() => {
-                    if (selectedShifts.length === 3) selectNone();
-                    else selectAll();
-                  }}
-                  className="px-2.5 py-1 rounded-lg text-[9px] font-black transition duration-200 cursor-pointer text-slate-500 hover:text-slate-800 dark:text-slate-400"
-                >
-                  {selectedShifts.length === 3 ? 'Nenhum' : 'Todos'}
-                </button>
-                <div className="h-3 w-[1px] bg-slate-350 dark:bg-slate-700 mx-0.5" />
-                {['T3', 'T1', 'T2'].map((shift) => {
-                  const isActive = selectedShifts.includes(shift);
-                  const label = shift === 'T1' ? '1º Turno' : shift === 'T2' ? '2º Turno' : '3º Turno';
-                  return (
-                    <button
-                      key={shift}
-                      onClick={() => toggleShift(shift)}
-                      className={`px-3 py-1 rounded-lg text-[9px] font-black transition duration-200 cursor-pointer ${
-                        isActive
-                          ? shift === 'T1'
-                            ? 'bg-emerald-600 text-white shadow-sm'
-                            : shift === 'T2'
-                              ? 'bg-amber-500 text-white shadow-sm'
-                              : 'bg-indigo-600 text-white shadow-sm'
-                          : 'text-slate-500 hover:text-slate-800 dark:text-slate-400'
-                      }`}
-                    >
-                      {label}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-
-          </div>
-        </div>
       </div>
 
 
@@ -841,23 +977,141 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
         </div>
       </div>
 
+      {/* Capacidade Calculada (T3 · T1 · T2) Card inserted between strip and table */}
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-5 shadow-sm mb-6">
+        <div className="flex items-center justify-between mb-3 pb-2 border-b border-slate-100 dark:border-slate-800">
+          <h4 className="text-xs font-black text-slate-700 dark:text-slate-200 flex items-center gap-2">
+            <span className="p-1 bg-cyan-50 dark:bg-cyan-900/20 rounded-lg">
+              <Gauge className="w-4 h-4 text-cyan-600 dark:text-cyan-400" />
+            </span>
+            Capacidade Calculada (T3 · T1 · T2)
+          </h4>
+          <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">{monthLabel}</span>
+        </div>
+
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+          {capacity.shifts.map(sc => (
+            <div key={sc.shift} className="p-3 rounded-2xl border border-slate-100 dark:border-slate-800 bg-slate-50/40 dark:bg-slate-900/50">
+              <div className="flex items-center justify-between mb-1">
+                <span className={`text-[9px] font-black px-1.5 py-0.5 rounded text-white ${sc.shift === 'T1' ? 'bg-emerald-600' : sc.shift === 'T2' ? 'bg-amber-500' : 'bg-indigo-600'}`}>{sc.shift}</span>
+                <span className="text-[9px] text-slate-400 font-bold">{sc.memberCount} colab</span>
+              </div>
+              <div className="flex items-baseline gap-1 mt-1">
+                <span className="text-lg font-black text-slate-800 dark:text-slate-100">{Math.round(sc.capacidadeDisponivel).toLocaleString('pt-BR')}</span>
+                <span className="text-[10px] text-slate-400">{operation.unit === 'm3' ? 'm³' : 'Pçs'}</span>
+              </div>
+              <div className="text-[9px] text-slate-400 mt-1 space-y-0.5">
+                <div>Trab: <strong className="text-slate-700 dark:text-slate-300">{sc.diasTrabalhados}d</strong></div>
+                <div>Folga: <strong className="text-slate-700 dark:text-slate-300">{sc.diasFolga}d</strong></div>
+                <div className="flex items-center justify-between gap-1 pt-1 border-t border-slate-100 dark:border-slate-800">
+                  <span>Cobert.:</span>
+                  <strong className={`${sc.cobertura >= 100 ? 'text-emerald-600' : sc.cobertura >= 80 ? 'text-amber-600' : 'text-red-500'}`}>
+                    {sc.cobertura}%
+                  </strong>
+                </div>
+              </div>
+            </div>
+          ))}
+          <div className="p-3 rounded-2xl border-2 border-blue-200 dark:border-blue-800 bg-blue-50/40 dark:bg-blue-950/30 lg:col-span-2 flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-[9px] font-black text-blue-700 dark:text-blue-300 uppercase tracking-wider">Total Geral</span>
+                <Activity className="w-3.5 h-3.5 text-blue-500" />
+              </div>
+              <div className="flex items-baseline gap-1 mt-1">
+                <span className="text-2xl font-black text-blue-700 dark:text-blue-400">{Math.round(capacity.totalCapacidade).toLocaleString('pt-BR')}</span>
+                <span className="text-[10px] text-blue-500">{operation.unit === 'm3' ? 'm³' : 'Pçs'}</span>
+              </div>
+              <div className="text-[9px] text-slate-600 dark:text-slate-400 mt-1 space-y-0.5">
+                <div>Capacidade após folgas: <strong className="text-slate-700 dark:text-slate-300">{Math.round(capacity.capacidadeApósFolgas).toLocaleString('pt-BR')}</strong></div>
+                <div>Necessidade: <strong className="text-slate-700 dark:text-slate-300">{Math.round(capacity.totalNecessidade).toLocaleString('pt-BR')}</strong></div>
+                <div className="flex items-center justify-between gap-1 pt-1 border-t border-blue-200/50 dark:border-blue-800/50">
+                  <span>Saldo</span>
+                  <strong className={capacity.totalSaldo >= 0 ? 'text-emerald-600' : 'text-red-500'}>
+                    {capacity.totalSaldo >= 0 ? '+' : ''}{Math.round(capacity.totalSaldo).toLocaleString('pt-BR')}
+                  </strong>
+                </div>
+                <div className="flex items-center justify-between gap-1">
+                  <span>Cobertura Geral</span>
+                  <strong className={`${capacity.coberturaGeral >= 100 ? 'text-emerald-600' : capacity.coberturaGeral >= 80 ? 'text-amber-600' : 'text-red-500'}`}>
+                    {capacity.coberturaGeral}%
+                  </strong>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="mb-6">
+        <OperationConfigPanel
+          operation={operation}
+          onChange={setOperation}
+          onGerarEscala={() => {
+            const monthVal = month ?? 0;
+            const yearVal = year ?? 2026;
+            console.log("[DEBUG onGerarEscala] Input colaboradores count:", colaboradores.length);
+            console.log("[DEBUG onGerarEscala] Input teams:", teams);
+            const result = generateIntelligentScale(
+              operation,
+              teams,
+              colaboradores,
+              monthVal,
+              yearVal,
+              demandaDiaria,
+              params?.maxConsecutiveWorkDays,
+              params?.rotationSequence
+            );
+            console.log("[DEBUG onGerarEscala] Output colaboradores count:", result.colaboradores.length);
+            onUpdateColaboradores?.(result.colaboradores);
+            onUpdateTeams?.(result.teams);
+          }}
+          // Grid Controls
+          viewMode={viewMode}
+          setViewMode={setViewMode}
+          collapsedGroups={collapsedGroups}
+          expandAll={expandAll}
+          collapseAll={collapseAll}
+          sortedGroupsLength={sortedGroups.length}
+          selectedShifts={selectedShifts}
+          toggleShift={toggleShift}
+          selectAll={selectAll}
+          selectNone={selectNone}
+          setShowTeamManager={setShowTeamManager}
+          // ScenarioManager
+          teams={teams}
+          params={params}
+          colaboradores={colaboradores}
+          dadosMensais={dadosMensais}
+          prodRateM3={prodRateM3}
+          prodRatePcs={prodRatePcs}
+          prodUnit={prodUnit}
+          activeScenarioName={activeScenarioName}
+          activeScenarioId={activeScenarioId}
+          isScenarioDirty={isScenarioDirty}
+          onScenarioSaved={onScenarioSaved}
+          onLoadScenario={onLoadScenario}
+        />
+      </div>
+
       <div className="border border-slate-100 dark:border-slate-800 rounded-2xl overflow-hidden">
         <table className="w-full text-left border-collapse text-[10px] table-fixed">
+          <colgroup>
+            <col className="w-[100px] min-w-[100px]" />
+            {Array.from({ length: diasCount }).map((_, d) => (
+              <col key={d} className="w-auto" />
+            ))}
+            <col className="w-[50px] min-w-[50px]" />
+          </colgroup>
           <thead>
             {/* Week divider row */}
             <tr className="bg-slate-100 dark:bg-slate-900/60 text-[10px] font-black text-slate-700 dark:text-slate-200 border-b border-slate-200 dark:border-slate-800">
-              <th className="p-1.5 sticky left-0 z-20 bg-slate-100 dark:bg-slate-900 w-[92px] min-w-[92px] border-r border-slate-200 dark:border-slate-800"></th>
-              {Array.from({ length: Math.ceil(diasCount / 7) }).map((_, wIdx) => {
-                const colSpan = Math.min(7, diasCount - wIdx * 7);
-                const startDay = wIdx * 7 + 1;
-                const endDay = Math.min((wIdx + 1) * 7, diasCount);
-                const dateLabel = (month !== undefined && year !== undefined)
-                  ? ` (${String(startDay).padStart(2, '0')}/${String(month + 1).padStart(2, '0')} a ${String(endDay).padStart(2, '0')}/${String(month + 1).padStart(2, '0')})`
-                  : '';
+              <th className="p-1.5 sticky left-0 z-20 bg-slate-100 dark:bg-slate-900 w-[110px] min-w-[110px] border-r border-slate-200 dark:border-slate-800"></th>
+              {weeksToRender.map((w, wIdx) => {
                 return (
-                  <th key={wIdx} colSpan={colSpan} className="p-1 text-center border-r-2 border-slate-300 dark:border-slate-700 font-extrabold tracking-wider text-slate-700 dark:text-slate-300 bg-slate-50 dark:bg-slate-900/40">
+                  <th key={wIdx} colSpan={w.colSpan} className="p-1 text-center border-r-2 border-slate-300 dark:border-slate-700 font-extrabold tracking-wider text-slate-700 dark:text-slate-300 bg-slate-50 dark:bg-slate-900/40">
                     <span className="inline-block px-2.5 py-0.5 rounded-full bg-slate-200/60 dark:bg-slate-800 text-[9px] font-black uppercase text-slate-700 dark:text-slate-300">
-                      Semana {wIdx + 1}{dateLabel}
+                      {w.label}
                     </span>
                   </th>
                 );
@@ -867,7 +1121,7 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
               </th>
             </tr>
             <tr className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800">
-              <th className="p-1.5 sticky left-0 z-20 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 font-bold text-slate-700 dark:text-slate-300 w-[92px] min-w-[92px] text-[10px]">
+              <th className="p-1.5 sticky left-0 z-20 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 font-bold text-slate-700 dark:text-slate-300 w-[110px] min-w-[110px] text-[10px]">
                 Colaborador
               </th>
               {Array.from({ length: diasCount }).map((_, d) => {
@@ -875,10 +1129,14 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
                 const isSat = dayOfWeek === 5;
                 const isSun = dayOfWeek === 6;
                 const weekdayName = WEEKDAYS[dayOfWeek];
+                const labelInfo = (month !== undefined && month !== -1 && year !== undefined)
+                  ? getDayLabel(year, month, d)
+                  : { dayStr: String(d + 1).padStart(2, '0'), monthStr: '' };
                 
                 return (
                   <th
                     key={d}
+                    title={labelInfo.monthStr ? `${labelInfo.dayStr}/${labelInfo.monthStr}/${year}` : undefined}
                     className={`p-1 text-center font-bold transition-colors ${
                       isSun 
                         ? 'bg-rose-50/60 dark:bg-rose-950/20 border-r-2 border-slate-300 dark:border-slate-700' 
@@ -903,7 +1161,7 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
                           ? 'text-blue-700 dark:text-blue-300' 
                           : 'text-slate-700 dark:text-slate-200'
                     }`}>
-                      {String(d + 1).padStart(2, '0')}
+                      {labelInfo.dayStr}
                     </div>
                   </th>
                 );
@@ -916,22 +1174,51 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
           
           <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
             {viewMode === 'grouped' ? (
-              sortedGroups.map((group) => {
-                const isCollapsed = collapsedGroups.includes(group.key);
-                return (
-                  <React.Fragment key={group.key}>
+              (() => {
+                let lastShift = '';
+                return sortedGroups.map((group) => {
+                  const isCollapsed = collapsedGroups.includes(group.key);
+                  const currentShift = group.members[0]?.turno || '';
+                  const showShiftHeader = currentShift !== lastShift;
+                  lastShift = currentShift;
+                  return (
+                    <React.Fragment key={group.key}>
+                      {showShiftHeader && (
+                        <tr className="bg-slate-100/90 dark:bg-slate-800 border-y border-slate-350 dark:border-slate-700">
+                          <td colSpan={diasCount + 2} className="p-2 py-2.5 sticky left-0 z-20 font-black text-[10px] text-slate-850 dark:text-slate-100 uppercase tracking-widest bg-slate-150/70 dark:bg-slate-800 shadow-sm border-r border-slate-200 dark:border-slate-700">
+                            <div className="flex items-center gap-2">
+                              <span className={`w-2.5 h-2.5 rounded-full ${
+                                currentShift === 'T1' 
+                                  ? 'bg-emerald-500 shadow-emerald-500/50 shadow'
+                                  : currentShift === 'T2'
+                                    ? 'bg-amber-500 shadow-amber-500/50 shadow'
+                                    : 'bg-indigo-500 shadow-indigo-500/50 shadow'
+                              }`} />
+                              <span className="font-extrabold text-[10.5px] text-slate-800 dark:text-slate-200">{group.shiftLabel}</span>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
                     {/* Group Header Row */}
                     <tr 
-                      onClick={() => toggleGroupCollapse(group.key)}
-                      className="bg-slate-50/50 dark:bg-slate-900/30 text-[9px] font-extrabold text-slate-600 dark:text-slate-300 hover:bg-slate-100/60 dark:hover:bg-slate-900/60 transition cursor-pointer select-none"
+                      className="bg-slate-50/50 dark:bg-slate-900/30 text-[9px] font-extrabold text-slate-600 dark:text-slate-300 transition select-none"
                     >
                       {isCollapsed ? (
                         <>
-                          {/* Collapsed Header: First Cell */}
-                          <td className="p-1 sticky left-0 z-20 bg-slate-50 dark:bg-slate-900 border-r border-b border-slate-200 dark:border-slate-800 font-bold text-slate-800 dark:text-slate-200 shadow-sm">
+                          {/* Collapsed Header: First Cell with Chevron */}
+                          <td 
+                            onClick={() => toggleGroupCollapse(group.key)}
+                            className="p-1 sticky left-0 z-20 bg-slate-50 dark:bg-slate-900 border-r border-b border-slate-200 dark:border-slate-800 font-bold text-slate-800 dark:text-slate-200 shadow-sm cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+                          >
                             <div className="flex items-center gap-1.5 text-[9px] overflow-hidden">
                               <ChevronRight className="w-3 h-3 text-slate-400 shrink-0" />
-                              <span className={`px-1.5 py-0.5 rounded font-black text-white text-[8.5px] shrink-0 ${TEAM_COLOR_MAP[group.teamColorKey]?.badge || 'bg-slate-600'}`}>
+                              <span className={`px-1.5 py-0.5 rounded font-black text-white text-[8.5px] shrink-0 ${
+                                currentShift === 'T1' 
+                                  ? 'bg-emerald-600 dark:bg-emerald-700'
+                                  : currentShift === 'T2'
+                                    ? 'bg-amber-600 dark:bg-amber-700'
+                                    : 'bg-indigo-600 dark:bg-indigo-700'
+                              }`}>
                                 {group.teamLabel}
                               </span>
                               <span className={`text-[7.5px] px-1 py-0.2 rounded font-black text-white uppercase shrink-0 ${
@@ -952,11 +1239,22 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
                             const dayOfWeek = (startDayOfWeek + d) % 7;
                             const isSun = dayOfWeek === 6;
                             const isSat = dayOfWeek === 5;
+                            const inGroupSel = isGroupCellInSelection(group.key, d);
                             
                             return (
                               <td
                                 key={d}
-                                className={`p-0.5 text-center text-[9px] font-black bg-slate-50/20 dark:bg-slate-900/10 text-slate-700 dark:text-slate-300 border-b border-slate-200 dark:border-slate-800 ${
+                                onMouseDown={(e) => {
+                                  e.stopPropagation();
+                                  handleGroupMouseDown(group.key, d, e);
+                                }}
+                                onMouseEnter={(e) => {
+                                  e.stopPropagation();
+                                  handleGroupMouseEnter(group.key, d);
+                                }}
+                                className={`p-0.5 text-center text-[9px] font-black bg-slate-50/20 dark:bg-slate-900/10 text-slate-700 dark:text-slate-300 border-b border-slate-200 dark:border-slate-800 select-none cursor-grab active:cursor-grabbing ${
+                                  inGroupSel ? 'ring-2 ring-blue-500 bg-blue-50 dark:bg-blue-950/40' : ''
+                                } ${
                                   isSun 
                                     ? 'border-r-2 border-slate-350 dark:border-slate-700' 
                                     : isSat 
@@ -964,17 +1262,28 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
                                       : 'border-r border-slate-200 dark:border-slate-800'
                                 }`}
                               >
-                                <div className="flex justify-center">
+                                <div className="flex justify-center relative">
                                   {count > 0 ? (
                                     <span className={`w-[19px] h-[19px] rounded-full flex items-center justify-center font-black text-[9px] text-white shadow-sm ${
-                                      TEAM_COLOR_MAP[group.teamColorKey]?.badge || 'bg-slate-600'
+                                      inGroupSel ? 'ring-2 ring-white scale-110' : ''
+                                    } ${
+                                      currentShift === 'T1' 
+                                        ? 'bg-emerald-600 dark:bg-emerald-700'
+                                        : currentShift === 'T2'
+                                          ? 'bg-amber-600 dark:bg-amber-700'
+                                          : 'bg-indigo-600 dark:bg-indigo-700'
                                     }`}>
                                       {count}
                                     </span>
                                   ) : (
-                                    <span className="w-[19px] h-[19px] flex items-center justify-center text-slate-300 dark:text-slate-700 font-normal">
+                                    <span className={`w-[19px] h-[19px] flex items-center justify-center text-slate-300 dark:text-slate-700 font-normal ${inGroupSel ? 'text-blue-500 font-bold' : ''}`}>
                                       0
                                     </span>
+                                  )}
+                                  {inGroupSel && d === dragGroupCurrentDay && (
+                                    <div className="absolute -top-7 left-1/2 -translate-x-1/2 z-30 bg-blue-600 text-white text-[8px] font-black px-1.5 py-0.5 rounded shadow-lg whitespace-nowrap pointer-events-none">
+                                      Aplicando em {group.members.length} colaboradores ({dragGroupAction === 'WORK' ? 'Trabalho' : 'Folga'})
+                                    </div>
                                   )}
                                 </div>
                               </td>
@@ -992,11 +1301,20 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
                       ) : (
                         /* Expanded Header: Single colSpan Cell */
                         <td colSpan={diasCount + 2} className="p-1.5 px-3 border-y border-slate-200/60 dark:border-slate-800/80 ">
-                          <div className="sticky left-3 z-10 flex items-center gap-2">
+                          <div 
+                            onClick={() => toggleGroupCollapse(group.key)}
+                            className="sticky left-3 z-10 flex items-center gap-2 cursor-pointer hover:opacity-80 transition"
+                          >
                             <ChevronDown className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                             <span className="text-slate-800 dark:text-slate-200">{group.shiftLabel}</span>
                             <span className="h-3 w-[1px] bg-slate-300 dark:bg-slate-700"></span>
-                            <span className={`px-1.5 py-0.5 rounded text-[8px] uppercase font-black text-white ${TEAM_COLOR_MAP[group.teamColorKey]?.badge || 'bg-slate-600'}`}>
+                            <span className={`px-1.5 py-0.5 rounded text-[8px] uppercase font-black text-white ${
+                              currentShift === 'T1' 
+                                ? 'bg-emerald-600 dark:bg-emerald-700'
+                                : currentShift === 'T2'
+                                  ? 'bg-amber-600 dark:bg-amber-700'
+                                  : 'bg-indigo-600 dark:bg-indigo-700'
+                            }`}>
                               {group.teamLabel}
                             </span>
                             <span className="text-slate-400 font-normal">({group.teamDesc})</span>
@@ -1010,8 +1328,9 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
                     {!isCollapsed && group.members.map((colab) => renderColaboradorRow(colab))}
                   </React.Fragment>
                 );
-              })
-            ) : (
+              });
+            })()
+          ) : (
               sortedColaboradoresConsolidated.map((colab) => renderColaboradorRow(colab))
             )}
 
@@ -1104,7 +1423,7 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
                     return (
                       <td
                         key={d}
-                        className={`p-0.5 text-center text-[9px] font-black text-slate-700 dark:text-slate-300 ${
+                        className={`p-0.5 text-center text-[8px] font-black tracking-tighter whitespace-nowrap text-slate-700 dark:text-slate-300 ${
                           isSun 
                             ? 'border-r-2 border-slate-300 dark:border-slate-700' 
                             : 'border-r border-slate-200 dark:border-slate-800'
@@ -1132,7 +1451,7 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
                     return (
                       <td
                         key={d}
-                        className={`p-0.5 text-center text-[9px] font-black text-blue-600 dark:text-blue-400 ${
+                        className={`p-0.5 text-center text-[8px] font-black tracking-tighter whitespace-nowrap text-blue-600 dark:text-blue-400 ${
                           isSun 
                             ? 'border-r-2 border-slate-300 dark:border-slate-700' 
                             : 'border-r border-slate-200 dark:border-slate-800'
@@ -1162,7 +1481,7 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
                     return (
                       <td
                         key={d}
-                        className={`p-0.5 text-center text-[9px] font-black text-slate-700 dark:text-slate-300 ${
+                        className={`p-0.5 text-center text-[8px] font-black tracking-tighter whitespace-nowrap text-slate-700 dark:text-slate-300 ${
                           isSun 
                             ? 'border-r-2 border-slate-300 dark:border-slate-700' 
                             : 'border-r border-slate-200 dark:border-slate-800'
@@ -1194,13 +1513,13 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
                     return (
                       <td
                         key={d}
-                        className={`p-0.5 text-center text-[9px] font-black ${
+                        className={`p-0.5 text-center text-[8px] font-black tracking-tighter whitespace-nowrap ${
                           isSun 
                             ? 'border-r-2 border-slate-300 dark:border-slate-700' 
                             : 'border-r border-slate-200 dark:border-slate-800'
                         } ${diff >= 0 ? 'text-emerald-600 dark:text-emerald-455' : 'text-red-555 dark:text-red-455'}`}
                       >
-                        {diff > 0 ? `+${diff}` : diff}
+                        {diff > 0 ? `+${diff.toLocaleString('pt-BR')}` : diff.toLocaleString('pt-BR')}
                       </td>
                     );
                   })}
@@ -1245,13 +1564,13 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
                     return (
                       <td
                         key={d}
-                        className={`p-0.5 text-center text-[9px] font-black ${
+                        className={`p-0.5 text-center text-[8px] font-black tracking-tighter whitespace-nowrap ${
                           isSun 
                             ? 'border-r-2 border-slate-300 dark:border-slate-700 bg-slate-50/50' 
                             : 'border-r border-slate-200 dark:border-slate-800 bg-slate-50/50'
                         } ${hcDiff >= 0 ? 'text-emerald-600 dark:text-emerald-455' : 'text-red-555 dark:text-red-455'}`}
                       >
-                        {hcDiff > 0 ? `+${hcDiff}` : hcDiff}
+                        {hcDiff > 0 ? `+${hcDiff.toLocaleString('pt-BR')}` : hcDiff.toLocaleString('pt-BR')}
                       </td>
                     );
                   })}
@@ -1267,11 +1586,11 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
                           });
                         }
                         const totalSal = totalCap - grandDemand;
-                        const avgHc = Math.round((totalSal / prodRate / diasCount) * 10) / 10;
+                        const avgHc = Math.round(totalSal / prodRate / diasCount);
                         return (
                           <>
                             <span className={avgHc >= 0 ? 'text-emerald-600 dark:text-emerald-455' : 'text-red-555 dark:text-red-455'}>
-                              {avgHc > 0 ? `+${avgHc}` : avgHc}
+                              {avgHc > 0 ? `+${avgHc.toLocaleString('pt-BR')}` : avgHc.toLocaleString('pt-BR')}
                             </span>
                           </>
                         );
@@ -1373,7 +1692,7 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
                           return (
                             <td
                               key={d}
-                              className={`p-0.5 text-center text-[9px] font-black text-slate-700 dark:text-slate-300 ${
+                              className={`p-0.5 text-center text-[8px] font-black tracking-tighter whitespace-nowrap text-slate-700 dark:text-slate-300 ${
                                 isSun 
                                   ? 'border-r-2 border-slate-300 dark:border-slate-700' 
                                   : isSat
@@ -1404,7 +1723,7 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
                           return (
                             <td
                               key={d}
-                              className={`p-0.5 text-center text-[9px] font-black text-slate-700 dark:text-slate-300 ${
+                              className={`p-0.5 text-center text-[8px] font-black tracking-tighter whitespace-nowrap text-slate-700 dark:text-slate-300 ${
                                 isSun 
                                   ? 'border-r-2 border-slate-300 dark:border-slate-700' 
                                   : isSat
@@ -1412,7 +1731,7 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
                                     : 'border-r border-slate-200 dark:border-slate-800'
                               }`}
                             >
-                              {count * prodRate}
+                              {(count * prodRate).toLocaleString('pt-BR')}
                             </td>
                           );
                         })}
@@ -1465,7 +1784,7 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
                                   const val = parseInt(e.target.value.replace(/\D/g, '')) || 0;
                                   handleDemandaChange(shift, d, val);
                                 }}
-                                className="w-full text-center text-[9px] font-extrabold bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded px-0.5 py-0.2 focus:outline-none focus:ring-1 focus:ring-slate-400"
+                                className="w-full text-center text-[8px] font-extrabold tracking-tighter bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded px-0.5 py-0.2 focus:outline-none focus:ring-1 focus:ring-slate-400"
                               />
                             </td>
                           );
@@ -1492,7 +1811,7 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
                           return (
                             <td
                               key={d}
-                              className={`p-0.5 text-center text-[9px] font-black ${
+                              className={`p-0.5 text-center text-[8px] font-black tracking-tighter whitespace-nowrap ${
                                 isSun 
                                   ? 'border-r-2 border-slate-300 dark:border-slate-700' 
                                   : isSat
@@ -1500,7 +1819,7 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
                                     : 'border-r border-slate-200 dark:border-slate-800'
                               } ${diff >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500 dark:text-red-400'}`}
                             >
-                              {diff > 0 ? `+${diff}` : diff}
+                              {diff > 0 ? `+${diff.toLocaleString('pt-BR')}` : diff.toLocaleString('pt-BR')}
                             </td>
                           );
                         })}
@@ -1539,7 +1858,7 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
                           return (
                             <td
                               key={d}
-                              className={`p-0.5 text-center text-[9px] font-black ${
+                              className={`p-0.5 text-center text-[8px] font-black tracking-tighter whitespace-nowrap ${
                                 isSun 
                                   ? 'border-r-2 border-slate-300 dark:border-slate-700 bg-slate-50/50' 
                                   : isSat
@@ -1547,7 +1866,7 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
                                     : 'border-r border-slate-200 dark:border-slate-800'
                               } ${hcDiff >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500 dark:text-red-400'}`}
                             >
-                              {hcDiff > 0 ? `+${hcDiff}` : hcDiff}
+                              {hcDiff > 0 ? `+${hcDiff.toLocaleString('pt-BR')}` : hcDiff.toLocaleString('pt-BR')}
                             </td>
                           );
                         })}
@@ -1558,11 +1877,11 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
                               const totalCap = Array.from({ length: diasCount }).map((_, d) => colaboradores.filter(c => c.turno === shift && c.escala[d] === 'WORK').length * prodRate).reduce((a, b) => a + b, 0);
                               const totalDem = (demandaDiaria[shift] || []).reduce((a, b) => a + b, 0);
                               const totalSal = totalCap - totalDem;
-                              const avgHc = Math.round((totalSal / prodRate / diasCount) * 10) / 10;
+                              const avgHc = Math.round(totalSal / prodRate / diasCount);
                               return (
                                 <>
                                   <span className={avgHc >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500 dark:text-red-400'}>
-                                    {avgHc > 0 ? `+${avgHc}` : avgHc}
+                                    {avgHc > 0 ? `+${avgHc.toLocaleString('pt-BR')}` : avgHc.toLocaleString('pt-BR')}
                                   </span>
                                   <span className="text-[6.5px] text-slate-400 font-normal">Média</span>
                                 </>
@@ -1580,6 +1899,25 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
           </tbody>
         </table>
       </div>
+    </div>
+
+    {/* WFM Analytics Dashboard below the Grid */}
+    <div className="mt-8">
+      <WfmIntelligencePanel
+        operation={operation}
+        onOperationChange={setOperation}
+        colaboradores={colaboradores}
+        teams={teams}
+        params={params ?? { conferentesT1: 14, conferentesT2: 10, conferentesT3: 16, weeks: 4, dias: diasCount, escala: '5x2', consecutiveOffDays: 2, maxConsecutiveSundays: 3, horasSemanais: 42, cenario: 'B', setor: 'comercio', month: month ?? 0, year: year ?? 2026 }}
+        demanda={demandaDiaria}
+        onGerarEscala={(res) => {
+          onUpdateColaboradores?.(res.colaboradores);
+          onUpdateTeams?.(res.teams);
+        }}
+        onUpdateColaboradores={(c) => {
+          onUpdateColaboradores?.(c);
+        }}
+      />
     </div>
 
     {/* Team Manager Modal */}

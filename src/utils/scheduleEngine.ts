@@ -56,6 +56,23 @@ export const BALANCED_SEQUENCES: number[][] = [
   [6, 1, 3, 5, 0],
 ];
 
+export function enforceMaxConsecutiveWorkDays(escala: DayStatus[], maxWork: number = 5): DayStatus[] {
+  const res = [...escala];
+  let consecutiveWork = 0;
+  for (let d = 0; d < res.length; d++) {
+    if (res[d] === 'WORK') {
+      consecutiveWork++;
+      if (consecutiveWork > maxWork) {
+        res[d] = 'OFF';
+        consecutiveWork = 0;
+      }
+    } else {
+      consecutiveWork = 0;
+    }
+  }
+  return res;
+}
+
 export function generateSchedule(params: ScheduleParams): Colaborador[] {
   const { conferentesT1, conferentesT2, conferentesT3 } = params;
   let dias = params.dias;
@@ -109,10 +126,12 @@ export function generateSchedule(params: ScheduleParams): Colaborador[] {
         }
       }
 
+      const correctedEscala = enforceMaxConsecutiveWorkDays(escala, 6);
+
       colaboradores.push({
         id: colabId,
         turno: shift.type,
-        escala,
+        escala: correctedEscala,
       });
     }
   }

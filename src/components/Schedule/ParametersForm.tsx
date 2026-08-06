@@ -4,6 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as zod from 'zod';
 import { Settings, Users, Calendar, Sparkles } from 'lucide-react';
 import type { ScheduleParams } from '../../types';
+import { getMonthInfo } from '../../utils/escala52Engine';
 const MONTH_NAMES = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
 
 const schema = zod.object({
@@ -20,6 +21,8 @@ const schema = zod.object({
   setor: zod.union([zod.literal('comercio'), zod.literal('supermercado')]),
   month: zod.number().min(0).max(11).optional(),
   year: zod.number().min(2020).max(2035).optional(),
+  maxConsecutiveWorkDays: zod.number().min(5).max(6).optional(),
+  rotationSequence: zod.union([zod.literal('A'), zod.literal('B')]).optional(),
 });
 
 interface ParametersFormProps {
@@ -55,11 +58,13 @@ export const ParametersForm: React.FC<ParametersFormProps> = ({
     setValue('setor', initialValues.setor);
     if (initialValues.month !== undefined) setValue('month', initialValues.month);
     if (initialValues.year !== undefined) setValue('year', initialValues.year);
+    setValue('maxConsecutiveWorkDays', initialValues.maxConsecutiveWorkDays ?? 6);
+    setValue('rotationSequence', initialValues.rotationSequence ?? 'A');
   }, [
     initialValues.conferentesT1, initialValues.conferentesT2, initialValues.conferentesT3,
     initialValues.weeks, initialValues.dias,
     initialValues.horasSemanais, initialValues.cenario, initialValues.setor,
-    initialValues.month, initialValues.year, setValue
+    initialValues.month, initialValues.year, initialValues.maxConsecutiveWorkDays, initialValues.rotationSequence, setValue
   ]);
 
   // Watch all values to trigger automatic recalculation
@@ -80,7 +85,7 @@ export const ParametersForm: React.FC<ParametersFormProps> = ({
     // Detect what changed
     if (currentMonth !== prevMonth || currentYear !== prevYear) {
       if (currentMonth !== undefined && currentMonth !== -1 && currentYear !== undefined) {
-        const calculatedDays = new Date(currentYear, currentMonth + 1, 0).getDate();
+        const calculatedDays = getMonthInfo(currentYear, currentMonth).dias;
         const calculatedWeeks = Math.ceil(calculatedDays / 7);
         setValue('dias', calculatedDays);
         setValue('weeks', calculatedWeeks);
@@ -287,6 +292,28 @@ export const ParametersForm: React.FC<ParametersFormProps> = ({
                 {watchedValues.setor === 'supermercado' && (
                   <option value={3}>3 domingos (Limite Supermercados)</option>
                 )}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-[10px] font-bold text-slate-400 mb-0.5">Máximo de Dias Trabalhados Consecutivos</label>
+              <select
+                className="w-full text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-1.5 focus:ring-1 focus:ring-blue-500 font-bold"
+                {...register('maxConsecutiveWorkDays', { valueAsNumber: true })}
+              >
+                <option value={5}>5 dias (Evita 6º dia de trabalho)</option>
+                <option value={6}>6 dias (Garante final de semana longo de 3 dias - Recomendado)</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-[10px] font-bold text-slate-400 mb-0.5">Ciclo de Rotação de Equipes</label>
+              <select
+                className="w-full text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-1.5 focus:ring-1 focus:ring-blue-500 font-bold"
+                {...register('rotationSequence')}
+              >
+                <option value="A">Rotação A (100% CLT Feminina - Folga Domingo 1x1)</option>
+                <option value="B">Rotação B (Operação Contínua - Folga Domingo 1x2)</option>
               </select>
             </div>
           </div>
