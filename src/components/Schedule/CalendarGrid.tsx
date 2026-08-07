@@ -7,6 +7,7 @@ import { ImportPmtModal } from './ImportPmtModal';
 import { ImportDemandaModal } from './ImportDemandaModal';
 import { WfmIntelligencePanel } from './WfmIntelligencePanel';
 import { OperationConfigPanel } from './OperationConfigPanel';
+import { MonthNavigator } from './MonthNavigator';
 import { DEFAULT_OPERATION, getOperationalWeekIndex, getDayLabel, getMonthInfo, getMondaysInMonth, computeCapacity, generateIntelligentScale } from '../../utils/escala52Engine';
 
 interface CalendarGridProps {
@@ -19,6 +20,7 @@ interface CalendarGridProps {
   isManualMode?: boolean;
   onToggleManualMode?: (val: boolean) => void;
   params?: ScheduleParams;
+  onParamsChange?: (newParams: ScheduleParams) => void;
   teams?: TeamConfig[];
   onUpdateTeams?: (teams: TeamConfig[]) => void;
   demandaDiariaM3Prop?: { [key: string]: number[] };
@@ -77,6 +79,7 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
   isManualMode = false,
   onToggleManualMode,
   params,
+  onParamsChange,
   teams = [],
   onUpdateTeams,
   demandaDiariaM3Prop,
@@ -118,17 +121,14 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
     let currentSpan = 0;
     let weekStartDay = 1;
 
-    const mondays = getMondaysInMonth(year, month);
-    const firstMonday = mondays && mondays.length > 0 ? mondays[0] : null;
-    if (!firstMonday) {
-      return Array.from({ length: Math.ceil(diasCount / 7) }).map((_, wIdx) => ({
-        weekNum: wIdx + 1,
-        colSpan: Math.min(7, diasCount - wIdx * 7),
-        label: `SEMANA ${wIdx + 1}`,
-      }));
-    }
+    const buildLabel = (span: number, wNum: number, th: Date, we: Date) => {
+      if (span <= 2) return `S${wNum}`;
+      if (span <= 4) return `SEM ${wNum}`;
+      return `SEM ${wNum} (${String(th.getUTCDate()).padStart(2, '0')}/${String(th.getUTCMonth() + 1).padStart(2, '0')} A ${String(we.getUTCDate()).padStart(2, '0')}/${String(we.getUTCMonth() + 1).padStart(2, '0')})`;
+    };
+
     for (let d = 0; d < diasCount; d++) {
-      const currentDate = new Date(firstMonday.getFullYear(), firstMonday.getMonth(), firstMonday.getDate() + d);
+      const currentDate = new Date(year, month, d + 1);
       const wIdx = getOperationalWeekIndex(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate());
       const wNum = wIdx + 1;
 
@@ -139,7 +139,7 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
           weeks.push({
             weekNum: currentWeekNum,
             colSpan: currentSpan,
-            label: `SEMANA ${currentWeekNum} (${String(thDate.getUTCDate()).padStart(2, '0')}/${String(thDate.getUTCMonth() + 1).padStart(2, '0')} A ${String(weDate.getUTCDate()).padStart(2, '0')}/${String(weDate.getUTCMonth() + 1).padStart(2, '0')})`,
+            label: buildLabel(currentSpan, currentWeekNum, thDate, weDate),
           });
         }
         currentWeekNum = wNum;
@@ -156,7 +156,7 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
       weeks.push({
         weekNum: currentWeekNum,
         colSpan: currentSpan,
-        label: `SEMANA ${currentWeekNum} (${String(thDate.getUTCDate()).padStart(2, '0')}/${String(thDate.getUTCMonth() + 1).padStart(2, '0')} A ${String(weDate.getUTCDate()).padStart(2, '0')}/${String(weDate.getUTCMonth() + 1).padStart(2, '0')})`,
+        label: buildLabel(currentSpan, currentWeekNum, thDate, weDate),
       });
     }
 
@@ -352,10 +352,20 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
     setSelectedShifts([]);
   };
 
-  const capacity = useMemo(
-    () => computeCapacity({ colaboradores, operation, month: month ?? 0, year: year ?? 2026, demanda: demandaDiaria }),
-    [colaboradores, operation, month, year, demandaDiaria]
-  );
+  const capacity = useMemo(() => {
+    const calcOp = {
+      ...operation,
+      prodRate,
+      unit: prodUnit,
+    };
+    return computeCapacity({
+      colaboradores,
+      operation: calcOp,
+      month: month ?? 0,
+      year: year ?? 2026,
+      demanda: demandaDiaria,
+    });
+  }, [colaboradores, operation, prodRate, prodUnit, month, year, demandaDiaria]);
 
   const monthLabel = month !== undefined && year !== undefined
     ? `${['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'][month]}/${year}`
@@ -690,6 +700,14 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
               }`}
             >
               <div className="flex justify-center relative">
+                {colab.turno === 'T3' && isWorking && (
+                  <span 
+                    className="absolute -left-[5px] top-1/2 -translate-y-1/2 text-orange-500 font-black text-[12px] pointer-events-none select-none leading-none"
+                    title="Este turno (T3) inicia às 22:00 da noite anterior"
+                  >
+                    ←
+                  </span>
+                )}
                 <span
                   onClick={() => {
                     if (!isDraggingRange) handleToggleDay(colab.id, d);
@@ -998,7 +1016,7 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
               </div>
               <div className="flex items-baseline gap-1 mt-1">
                 <span className="text-lg font-black text-slate-800 dark:text-slate-100">{Math.round(sc.capacidadeDisponivel).toLocaleString('pt-BR')}</span>
-                <span className="text-[10px] text-slate-400">{operation.unit === 'm3' ? 'm³' : 'Pçs'}</span>
+                <span className="text-[10px] text-slate-400">{prodUnit === 'm3' ? 'm³' : 'Pçs'}</span>
               </div>
               <div className="text-[9px] text-slate-400 mt-1 space-y-0.5">
                 <div>Trab: <strong className="text-slate-700 dark:text-slate-300">{sc.diasTrabalhados}d</strong></div>
@@ -1020,7 +1038,7 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
               </div>
               <div className="flex items-baseline gap-1 mt-1">
                 <span className="text-2xl font-black text-blue-700 dark:text-blue-400">{Math.round(capacity.totalCapacidade).toLocaleString('pt-BR')}</span>
-                <span className="text-[10px] text-blue-500">{operation.unit === 'm3' ? 'm³' : 'Pçs'}</span>
+                <span className="text-[10px] text-blue-500">{prodUnit === 'm3' ? 'm³' : 'Pçs'}</span>
               </div>
               <div className="text-[9px] text-slate-600 dark:text-slate-400 mt-1 space-y-0.5">
                 <div>Capacidade após folgas: <strong className="text-slate-700 dark:text-slate-300">{Math.round(capacity.capacidadeApósFolgas).toLocaleString('pt-BR')}</strong></div>
@@ -1097,31 +1115,54 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
       <div className="border border-slate-100 dark:border-slate-800 rounded-2xl overflow-hidden">
         <table className="w-full text-left border-collapse text-[10px] table-fixed">
           <colgroup>
-            <col className="w-[100px] min-w-[100px]" />
+            <col className="w-[125px] min-w-[125px]" />
             {Array.from({ length: diasCount }).map((_, d) => (
               <col key={d} className="w-auto" />
             ))}
-            <col className="w-[50px] min-w-[50px]" />
+            <col className="w-[80px] min-w-[80px]" />
           </colgroup>
           <thead>
             {/* Week divider row */}
             <tr className="bg-slate-100 dark:bg-slate-900/60 text-[10px] font-black text-slate-700 dark:text-slate-200 border-b border-slate-200 dark:border-slate-800">
-              <th className="p-1.5 sticky left-0 z-20 bg-slate-100 dark:bg-slate-900 w-[110px] min-w-[110px] border-r border-slate-200 dark:border-slate-800"></th>
+              <th className="p-1.5 sticky left-0 z-20 bg-slate-100 dark:bg-slate-900 w-[125px] min-w-[125px] border-r border-slate-200 dark:border-slate-800 align-middle">
+                {params && onParamsChange ? (
+                  <MonthNavigator
+                    month={params.month}
+                    year={params.year}
+                    onChangeMonthYear={(newM, newY, calculatedDays, calculatedWeeks) => {
+                      onParamsChange({
+                        ...params,
+                        month: newM,
+                        year: newY,
+                        dias: calculatedDays,
+                        weeks: calculatedWeeks,
+                      });
+                    }}
+                    variant="grid"
+                  />
+                ) : null}
+              </th>
               {weeksToRender.map((w, wIdx) => {
                 return (
                   <th key={wIdx} colSpan={w.colSpan} className="p-1 text-center border-r-2 border-slate-300 dark:border-slate-700 font-extrabold tracking-wider text-slate-700 dark:text-slate-300 bg-slate-50 dark:bg-slate-900/40">
-                    <span className="inline-block px-2.5 py-0.5 rounded-full bg-slate-200/60 dark:bg-slate-800 text-[9px] font-black uppercase text-slate-700 dark:text-slate-300">
-                      {w.label}
-                    </span>
+                    {w.colSpan <= 2 ? (
+                      <span className="text-[9px] font-black uppercase text-slate-650 dark:text-slate-300">
+                        {w.label}
+                      </span>
+                    ) : (
+                      <span className="inline-block px-2.5 py-0.5 rounded-full bg-slate-200/60 dark:bg-slate-800 text-[9px] font-black uppercase text-slate-700 dark:text-slate-300">
+                        {w.label}
+                      </span>
+                    )}
                   </th>
                 );
               })}
-              <th className="p-1 text-center bg-slate-150 dark:bg-slate-900/80 border-l border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-200 font-black w-[55px] min-w-[55px] uppercase text-[9px]">
+              <th className="p-1 text-center bg-slate-150 dark:bg-slate-900/80 border-l border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-200 font-black w-[80px] min-w-[80px] uppercase text-[9px]">
                 Resumo
               </th>
             </tr>
             <tr className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800">
-              <th className="p-1.5 sticky left-0 z-20 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 font-bold text-slate-700 dark:text-slate-300 w-[110px] min-w-[110px] text-[10px]">
+              <th className="p-1.5 sticky left-0 z-20 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 font-bold text-slate-700 dark:text-slate-300 w-[125px] min-w-[125px] text-[10px]">
                 Colaborador
               </th>
               {Array.from({ length: diasCount }).map((_, d) => {
@@ -1166,7 +1207,7 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
                   </th>
                 );
               })}
-              <th className="p-1.5 text-center bg-slate-50 dark:bg-slate-900 text-slate-600 dark:text-slate-300 font-bold border-l border-slate-200 dark:border-slate-800 w-[55px] min-w-[55px] text-[9.5px]">
+              <th className="p-1.5 text-center bg-slate-50 dark:bg-slate-900 text-slate-600 dark:text-slate-300 font-bold border-l border-slate-200 dark:border-slate-800 w-[80px] min-w-[80px] text-[9.5px]">
                 Total/Méd.
               </th>
             </tr>
@@ -1263,6 +1304,14 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
                                 }`}
                               >
                                 <div className="flex justify-center relative">
+                                  {currentShift === 'T3' && count > 0 && (
+                                    <span 
+                                      className="absolute -left-[5px] top-1/2 -translate-y-1/2 text-orange-500 font-black text-[12px] pointer-events-none select-none leading-none"
+                                      title="Este turno (T3) inicia às 22:00 da noite anterior"
+                                    >
+                                      ←
+                                    </span>
+                                  )}
                                   {count > 0 ? (
                                     <span className={`w-[19px] h-[19px] rounded-full flex items-center justify-center font-black text-[9px] text-white shadow-sm ${
                                       inGroupSel ? 'ring-2 ring-white scale-110' : ''

@@ -10,7 +10,7 @@ import { TeamPanel } from './TeamPanel';
 import { CollaboratorWorkbench } from './CollaboratorWorkbench';
 import {
   computeCapacity, computeDashboardOperation, computeDistribution, computeEquity,
-  generateIntelligentScale,
+  generateIntelligentScale, buildCanonicalTeams, letterFromName
 } from '../../utils/escala52Engine';
 import { BarChart3, Users, Activity, Gauge, Settings2 } from 'lucide-react';
 import { teamColorOf } from '../../utils/teamColors';
@@ -54,6 +54,82 @@ export const WfmIntelligencePanel: React.FC<WfmIntelligencePanelProps> = ({
     () => computeEquity(colaboradores, teams, month, year),
     [colaboradores, teams, month, year],
   );
+
+  const annualEquity: EquidadeResult = useMemo(() => {
+    const yearlyTeams = teams && teams.length > 0 ? teams : buildCanonicalTeams(operation);
+    const totals: Record<string, {
+      finsDeSemanaCompletos: number;
+      sabadosOff: number;
+      domingosOff: number;
+      members: number;
+    }> = {};
+    
+    yearlyTeams.forEach(t => {
+      totals[t.name] = { finsDeSemanaCompletos: 0, sabadosOff: 0, domingosOff: 0, members: t.memberCount };
+    });
+
+    for (let m = 0; m < 12; m++) {
+      const generated = generateIntelligentScale(
+        operation,
+        teams,
+        colaboradores,
+        m,
+        year,
+        undefined,
+        params.maxConsecutiveWorkDays,
+        params.rotationSequence
+      );
+      const dist = computeDistribution(generated.colaboradores, generated.teams, m, year);
+      dist.forEach(d => {
+        if (totals[d.teamName]) {
+          totals[d.teamName].finsDeSemanaCompletos += d.finsDeSemanaCompletos;
+          totals[d.teamName].sabadosOff += d.sabados;
+          totals[d.teamName].domingosOff += d.domingos;
+        }
+      });
+    }
+
+    const rows = yearlyTeams.map(t => {
+      const tot = totals[t.name] || { finsDeSemanaCompletos: 0, sabadosOff: 0, domingosOff: 0, members: t.memberCount };
+      return {
+        letter: letterFromName(t.name),
+        label: t.name,
+        members: tot.members,
+        finsDeSemanaCompletos: tot.finsDeSemanaCompletos,
+        sabadosOff: tot.sabadosOff,
+        domingosOff: tot.domingosOff,
+        mediaFinalsPorColab: tot.members > 0 ? Math.round((tot.finsDeSemanaCompletos / tot.members) * 100) / 100 : 0,
+        percentualEquilibrio: 100,
+        alert: false,
+      };
+    });
+
+    let maxFinalsPer = 0;
+    let minFinalsPer = Infinity;
+    rows.forEach(r => {
+      if (r.members > 0) {
+        maxFinalsPer = Math.max(maxFinalsPer, r.mediaFinalsPorColab);
+        minFinalsPer = Math.min(minFinalsPer, r.mediaFinalsPorColab);
+      }
+    });
+    
+    const balanceGlobal = maxFinalsPer > 0 ? Math.round(Math.max(0, 100 * (1 - (maxFinalsPer - minFinalsPer) / maxFinalsPer))) : 100;
+    const totalFinals = rows.reduce((a, b) => a + b.finsDeSemanaCompletos, 0);
+    const totalMembers = rows.reduce((a, b) => a + b.members, 0);
+    const expected = totalMembers > 0 ? totalFinals / totalMembers : 0;
+
+    rows.forEach(r => {
+      const deviation = expected > 0 ? Math.abs(r.mediaFinalsPorColab - expected) : 0;
+      r.percentualEquilibrio = expected > 0 ? Math.round(Math.max(0, Math.min(100, 100 * (1 - deviation / expected)))) : 100;
+    });
+
+    return {
+      rows,
+      balanceGlobal,
+      hasAlert: false,
+      alerts: [],
+    };
+  }, [operation, teams, colaboradores, year, params.maxConsecutiveWorkDays, params.rotationSequence]);
 
   const capacity: CapacityResult = useMemo(
     () => computeCapacity({ colaboradores, operation, month, year, demanda }),
@@ -139,7 +215,7 @@ export const WfmIntelligencePanel: React.FC<WfmIntelligencePanelProps> = ({
       {/* Distribution + Equity cards */}
       <div className="grid grid-cols-1 gap-4">
         <DistribuicaoFolgasCard rows={distribution} monthLabel={monthLabel} />
-        <EquidadeCard data={equity} monthLabel={monthLabel} />
+        <EquidadeCard data={equity} annualData={annualEquity} monthLabel={monthLabel} yearLabel={String(year)} />
       </div>
     </section>
   );

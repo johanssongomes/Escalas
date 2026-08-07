@@ -1,11 +1,13 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Scale, AlertTriangle, TrendingUp } from 'lucide-react';
 import type { EquityResult } from '../../types';
 import { teamColorOf } from '../../utils/teamColors';
 
 interface EquidadeCardProps {
   data: EquityResult;
+  annualData?: EquityResult;
   monthLabel?: string;
+  yearLabel?: string;
 }
 
 const LETTER_COLOR: Record<string, 'emerald' | 'amber' | 'indigo' | 'rose'> = {
@@ -15,22 +17,47 @@ const LETTER_COLOR: Record<string, 'emerald' | 'amber' | 'indigo' | 'rose'> = {
   D: 'rose',
 };
 
-export const EquidadeCard: React.FC<EquidadeCardProps> = ({ data, monthLabel }) => {
-  const { rows, balanceGlobal, hasAlert, alerts } = data;
+export const EquidadeCard: React.FC<EquidadeCardProps> = ({ data, annualData, monthLabel, yearLabel }) => {
+  const [viewMode, setViewMode] = useState<'monthly' | 'yearly'>('monthly');
+
+  const activeData = viewMode === 'yearly' && annualData ? annualData : data;
+  const { rows, balanceGlobal, hasAlert, alerts } = activeData;
 
   return (
     <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-5 shadow-sm h-full">
       <div className="flex items-center justify-between mb-3 pb-2 border-b border-slate-100 dark:border-slate-800">
-        <h4 className="text-xs font-black text-slate-700 dark:text-slate-200 flex items-center gap-2">
-          <span className={`p-1 rounded-lg ${hasAlert ? 'bg-rose-50 dark:bg-rose-900/20' : 'bg-indigo-50 dark:bg-indigo-900/20'}`}>
-            <Scale className={`w-4 h-4 ${hasAlert ? 'text-rose-600' : 'text-indigo-600'}`} />
-          </span>
-          Equidade
-        </h4>
-        <div className="flex items-center gap-2">
-          {monthLabel && (
-            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">{monthLabel}</span>
+        <div className="flex items-center gap-3">
+          <h4 className="text-xs font-black text-slate-700 dark:text-slate-200 flex items-center gap-2">
+            <span className={`p-1 rounded-lg ${hasAlert ? 'bg-rose-50 dark:bg-rose-900/20' : 'bg-indigo-50 dark:bg-indigo-900/20'}`}>
+              <Scale className={`w-4 h-4 ${hasAlert ? 'text-rose-600' : 'text-indigo-600'}`} />
+            </span>
+            Equidade {viewMode === 'yearly' ? 'Anual' : 'Mensal'}
+          </h4>
+          
+          {annualData && (
+            <div className="flex items-center gap-0.5 bg-slate-100 dark:bg-slate-800/80 p-0.5 rounded-lg text-[9px] font-bold">
+              <button
+                type="button"
+                onClick={() => setViewMode('monthly')}
+                className={`px-2 py-0.5 rounded-md transition ${viewMode === 'monthly' ? 'bg-white dark:bg-slate-700 shadow-xs text-slate-800 dark:text-white' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700'}`}
+              >
+                Mês
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode('yearly')}
+                className={`px-2 py-0.5 rounded-md transition ${viewMode === 'yearly' ? 'bg-white dark:bg-slate-700 shadow-xs text-slate-800 dark:text-white' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700'}`}
+              >
+                Ano
+              </button>
+            </div>
           )}
+        </div>
+
+        <div className="flex items-center gap-2">
+          <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">
+            {viewMode === 'yearly' ? yearLabel : monthLabel}
+          </span>
           <span className={`text-[9px] font-black px-2 py-0.5 rounded-full ${balanceGlobal >= 90 ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' : balanceGlobal >= 70 ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'}`}>
             {balanceGlobal}% eq.
           </span>

@@ -84,15 +84,10 @@ export function getMondaysInMonth(year: number, month: number): Date[] {
 }
 
 export function getDayLabel(year: number, month: number, d: number): { dayStr: string; monthStr: string } {
-  const mondays = getMondaysInMonth(year, month);
-  if (!mondays || mondays.length === 0) {
+  if (year === undefined || month === undefined || isNaN(year) || isNaN(month) || month === -1) {
     return { dayStr: String(d + 1).padStart(2, '0'), monthStr: '' };
   }
-  const firstMonday = mondays[0];
-  if (!firstMonday) {
-    return { dayStr: String(d + 1).padStart(2, '0'), monthStr: '' };
-  }
-  const currentDate = new Date(firstMonday.getFullYear(), firstMonday.getMonth(), firstMonday.getDate() + d);
+  const currentDate = new Date(year, month, d + 1);
   return {
     dayStr: String(currentDate.getDate()).padStart(2, '0'),
     monthStr: String(currentDate.getMonth() + 1).padStart(2, '0'),
@@ -117,20 +112,8 @@ export function getMonthInfo(year: number, month: number): MonthInfo {
     return { dias, startDayOfWeek, weekdays, sabados, domingos, saturdayDays, sundayDays };
   }
 
-  const mondays = getMondaysInMonth(year, month);
-  if (mondays.length === 0) {
-    return { 
-      dias: 28, 
-      startDayOfWeek: 0, 
-      weekdays: Array(28).fill(0).map((_, i) => (0 + i) % 7), 
-      sabados: 4, 
-      domingos: 4, 
-      saturdayDays: [5, 12, 19, 26], 
-      sundayDays: [6, 13, 20, 27] 
-    };
-  }
-  const dias = mondays.length * 7;
-  const startDayOfWeek = 0; // Monday (since the view now starts on Monday)
+  const dias = new Date(year, month + 1, 0).getDate();
+  const startDayOfWeek = (new Date(year, month, 1).getDay() + 6) % 7; // 0=Seg ... 6=Dom
   const weekdays: number[] = [];
   const saturdayDays: number[] = [];
   const sundayDays: number[] = [];
@@ -304,9 +287,6 @@ export function generateIntelligentScale(
       assigned[t.name].push(...pool.splice(0, room));
     }
 
-    const mondays = getMondaysInMonth(year, month);
-    const firstMonday = mondays && mondays.length > 0 ? mondays[0] : null;
-
     for (const t of shiftTeams) {
       const letter = letterFromName(t.name);
       const letterIdx = Math.max(0, TEAM_LETTERS.indexOf(letter));
@@ -314,11 +294,8 @@ export function generateIntelligentScale(
       for (const m of assigned[t.name]) {
         const escala: DayStatus[] = [];
         for (let d = 0; d < dias; d++) {
-          let absoluteWeek = Math.floor(d / 7);
-          if (firstMonday) {
-            const currentDate = new Date(firstMonday.getFullYear(), firstMonday.getMonth(), firstMonday.getDate() + d);
-            absoluteWeek = getOperationalWeekIndex(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate());
-          }
+          const currentDate = new Date(year, month, d + 1);
+          const absoluteWeek = getOperationalWeekIndex(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate());
           const step = (letterIdx + absoluteWeek) % 4;
 
           const dw = (startDayOfWeek + d) % 7;
@@ -506,7 +483,18 @@ export function computeCapacity(input: CapacityInput): CapacityResult {
   const { dias } = getMonthInfo(year, month);
   const operationalDays = operation.sundayClosed ? dias - getMonthInfo(year, month).domingos : dias;
   const shifts: ShiftCapacity[] = [];
-  const prodOf = (c: Colaborador) => c.prodRate ?? operation.prodRate;
+  const prodOf = (c: Colaborador) => {
+    if (c.prodRate !== undefined && c.prodRate !== null) {
+      if (operation.unit === 'pcs' && c.prodRate <= 50) {
+        return c.prodRate * 10;
+      }
+      if (operation.unit === 'm3' && c.prodRate > 50) {
+        return c.prodRate / 10;
+      }
+      return c.prodRate;
+    }
+    return operation.prodRate;
+  };
 
   for (const shift of ['T1', 'T2', 'T3'] as ShiftType[]) {
     const members = colaboradores.filter(c => c.turno === shift && c.team);
@@ -593,7 +581,18 @@ export interface DailyOperation {
 export function computeDashboardOperation(input: DailyOperationInput): DailyOperation {
   const { colaboradores, operation, month, year, demanda } = input;
   const { dias } = getMonthInfo(year, month);
-  const prodOf = (c: Colaborador) => c.prodRate ?? operation.prodRate;
+  const prodOf = (c: Colaborador) => {
+    if (c.prodRate !== undefined && c.prodRate !== null) {
+      if (operation.unit === 'pcs' && c.prodRate <= 50) {
+        return c.prodRate * 10;
+      }
+      if (operation.unit === 'm3' && c.prodRate > 50) {
+        return c.prodRate / 10;
+      }
+      return c.prodRate;
+    }
+    return operation.prodRate;
+  };
 
   const demandaDia: number[] = Array(dias).fill(0);
   const capacidadeDia: number[] = Array(dias).fill(0);

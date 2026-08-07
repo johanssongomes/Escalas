@@ -2,10 +2,11 @@ import React, { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as zod from 'zod';
-import { Settings, Users, Calendar, Sparkles } from 'lucide-react';
+import { Settings, Users, Calendar, Sparkles, Info } from 'lucide-react';
 import type { ScheduleParams } from '../../types';
 import { getMonthInfo } from '../../utils/escala52Engine';
-const MONTH_NAMES = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+import { MonthNavigator } from './MonthNavigator';
+// const MONTH_NAMES = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
 
 const schema = zod.object({
   conferentesT1: zod.number().min(1, 'Mínimo 1').max(100, 'Máximo 100'),
@@ -46,13 +47,10 @@ export const ParametersForm: React.FC<ParametersFormProps> = ({
     defaultValues: initialValues,
   });
 
-  // Keep form in sync when parent initialValues change (scenario load, etc.)
   useEffect(() => {
     setValue('conferentesT1', initialValues.conferentesT1);
     setValue('conferentesT2', initialValues.conferentesT2);
     setValue('conferentesT3', initialValues.conferentesT3);
-    setValue('weeks', initialValues.weeks);
-    setValue('dias', initialValues.dias);
     setValue('horasSemanais', initialValues.horasSemanais);
     setValue('cenario', initialValues.cenario);
     setValue('setor', initialValues.setor);
@@ -60,6 +58,16 @@ export const ParametersForm: React.FC<ParametersFormProps> = ({
     if (initialValues.year !== undefined) setValue('year', initialValues.year);
     setValue('maxConsecutiveWorkDays', initialValues.maxConsecutiveWorkDays ?? 6);
     setValue('rotationSequence', initialValues.rotationSequence ?? 'A');
+
+    if (initialValues.month !== undefined && initialValues.month !== -1 && initialValues.year !== undefined) {
+      const calculatedDays = getMonthInfo(initialValues.year, initialValues.month).dias;
+      const calculatedWeeks = Math.ceil(calculatedDays / 7);
+      setValue('dias', calculatedDays);
+      setValue('weeks', calculatedWeeks);
+    } else {
+      setValue('weeks', initialValues.weeks);
+      setValue('dias', initialValues.dias);
+    }
   }, [
     initialValues.conferentesT1, initialValues.conferentesT2, initialValues.conferentesT3,
     initialValues.weeks, initialValues.dias,
@@ -198,36 +206,34 @@ export const ParametersForm: React.FC<ParametersFormProps> = ({
           </div>
 
           <div className="grid grid-cols-2 gap-2.5">
-            <div>
+            <div className="col-span-2">
               <label className="block text-[10px] font-bold text-slate-400 mb-0.5">Mês de Referência</label>
-              <select
-                className="w-full text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-1.5 focus:ring-1 focus:ring-blue-500 font-bold"
-                {...register('month', { valueAsNumber: true })}
-              >
-                <option value={-1}>Personalizado</option>
-                {MONTH_NAMES.map((name, idx) => (
-                  <option key={idx} value={idx}>{name}</option>
-                ))}
-              </select>
-            </div>
-            
-            <div>
-              <label className="block text-[10px] font-bold text-slate-400 mb-0.5">Ano</label>
-              <select
-                className="w-full text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-1.5 focus:ring-1 focus:ring-blue-500 font-bold"
-                {...register('year', { valueAsNumber: true })}
-              >
-                {[2025, 2026, 2027, 2028, 2029, 2030].map(y => (
-                  <option key={y} value={y}>{y}</option>
-                ))}
-              </select>
+              <MonthNavigator
+                month={watchedValues.month}
+                year={watchedValues.year}
+                onChangeMonthYear={(newM, newY, calculatedDays, calculatedWeeks) => {
+                  setValue('month', newM);
+                  setValue('year', newY);
+                  setValue('dias', calculatedDays);
+                  setValue('weeks', calculatedWeeks);
+                  onChange({
+                    ...watchedValues,
+                    month: newM,
+                    year: newY,
+                    dias: calculatedDays,
+                    weeks: calculatedWeeks,
+                  } as ScheduleParams);
+                }}
+                variant="form"
+              />
             </div>
 
             <div>
               <label className="block text-[10px] font-bold text-slate-400 mb-0.5">Semanas</label>
               <select
-                className="w-full text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-1.5 focus:ring-1 focus:ring-blue-500 font-bold"
+                className="w-full text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-1.5 focus:ring-1 focus:ring-blue-500 font-bold disabled:opacity-60 disabled:bg-slate-50 dark:disabled:bg-slate-950/40 disabled:cursor-not-allowed"
                 {...register('weeks', { valueAsNumber: true })}
+                disabled={watchedValues.month !== -1}
               >
                 <option value={2}>2 semanas</option>
                 <option value={4}>4 semanas</option>
@@ -243,8 +249,9 @@ export const ParametersForm: React.FC<ParametersFormProps> = ({
                 type="number"
                 min={7}
                 max={84}
-                className="w-full text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-1.5 font-bold focus:ring-1 focus:ring-blue-500"
+                className="w-full text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-1.5 font-bold focus:ring-1 focus:ring-blue-500 disabled:opacity-60 disabled:bg-slate-50 dark:disabled:bg-slate-950/40 disabled:cursor-not-allowed"
                 {...register('dias', { valueAsNumber: true })}
+                disabled={watchedValues.month !== -1}
               />
             </div>
 
@@ -316,6 +323,60 @@ export const ParametersForm: React.FC<ParametersFormProps> = ({
                 <option value="B">Rotação B (Operação Contínua - Folga Domingo 1x2)</option>
               </select>
             </div>
+
+            {(() => {
+              const maxWorkDays = watchedValues.maxConsecutiveWorkDays ?? 6;
+              const rotation = watchedValues.rotationSequence ?? 'A';
+              
+              const exp = rotation === 'B'
+                ? (maxWorkDays === 5
+                  ? {
+                      title: 'Rotação B + Limite de 5 Dias',
+                      badge: 'Operação Contínua',
+                      color: 'blue',
+                      desc: 'Nesta rotação, a sequência natural de trabalho nunca passa de 5 dias seguidos (Folga Dom/Seg → Sáb/Dom → Qui/Sex → Ter/Qua). A escala permanece natural e otimizada.'
+                    }
+                  : {
+                      title: 'Rotação B + Limite de 6 Dias',
+                      badge: 'Operação Contínua',
+                      color: 'blue',
+                      desc: 'Como a Rotação B já possui no máximo 5 dias de trabalho consecutivos por natureza, o limite de 6 dias não gera nenhuma alteração prática ou quebra na escala.'
+                    }
+                )
+                : (maxWorkDays === 5
+                  ? {
+                      title: 'Rotação A + Limite de 5 Dias',
+                      badge: '100% CLT Feminina',
+                      color: 'amber',
+                      desc: 'A transição Qui/Sex → Sáb/Dom geraria 7 dias de trabalho seguidos. Com limite de 5 dias, o sistema quebra essa sequência inserindo folgas intermediárias.'
+                    }
+                  : {
+                      title: 'Rotação A + Limite de 6 Dias',
+                      badge: '100% CLT Feminina',
+                      color: 'amber',
+                      desc: 'Evita os 7 dias de trabalho consecutivos na transição Qui/Sex → Sáb/Dom. O sistema insere um limite de 6 dias, gerando um final de semana longo de 3 dias.'
+                    }
+                );
+
+              return (
+                <div className="mt-3 p-2.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/60 text-[11px] space-y-1">
+                  <div className="flex items-center gap-1.5 font-bold text-slate-700 dark:text-slate-300">
+                    <Info className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                    <span>{exp.title}</span>
+                    <span className={`ml-auto text-[9px] px-1.5 py-0.5 rounded-full font-bold ${
+                      exp.color === 'blue'
+                        ? 'bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400'
+                        : 'bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400'
+                    }`}>
+                      {exp.badge}
+                    </span>
+                  </div>
+                  <p className="text-slate-500 dark:text-slate-400 leading-relaxed font-semibold">
+                    {exp.desc}
+                  </p>
+                </div>
+              );
+            })()}
           </div>
         </div>
       </div>

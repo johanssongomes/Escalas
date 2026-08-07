@@ -73,9 +73,9 @@ function App() {
     }
     return false;
   });
-  const [params, setParams] = useState<ScheduleParams>(() => {
+  const [params, setParamsState] = useState<ScheduleParams>(() => {
     const today = new Date();
-    return {
+    const initial = {
       conferentesT1: 14,
       conferentesT2: 10,
       conferentesT3: 16,
@@ -93,7 +93,26 @@ function App() {
       maxConsecutiveWorkDays: 6,
       rotationSequence: 'A',
     };
+    const info = getMonthInfo(initial.year, initial.month);
+    initial.dias = info.dias;
+    initial.weeks = Math.ceil(info.dias / 7);
+    return initial;
   });
+
+  const setParams = useCallback((updated: ScheduleParams | ((prev: ScheduleParams) => ScheduleParams)) => {
+    setParamsState(prev => {
+      const next = typeof updated === 'function' ? (updated as Function)(prev) : updated;
+      if (next.month !== undefined && next.month !== -1 && next.year !== undefined) {
+        const info = getMonthInfo(next.year, next.month);
+        return {
+          ...next,
+          dias: info.dias,
+          weeks: Math.ceil(info.dias / 7)
+        };
+      }
+      return next;
+    });
+  }, [setParamsState]);
 
   const handleOperationChange = (newOp: OperationConfig) => {
     const t1Count = newOp.shifts.T1?.memberCount ?? params.conferentesT1;
@@ -1085,6 +1104,7 @@ function App() {
                  operation={params.operation ?? DEFAULT_OPERATION}
                  onOperationChange={handleOperationChange}
                  onUpdateTeams={handleUpdateTeams}
+                 onParamsChange={handleParamsChange}
                 demandaDiariaM3Prop={dadosMes.demandaM3}
                 demandaDiariaPcsProp={dadosMes.demandaPcs}
                 onDemandaChangeM3={handleDemandaM3Change}
