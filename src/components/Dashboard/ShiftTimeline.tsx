@@ -3,7 +3,7 @@ import { Clock, Info } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { getScenarioDetails } from '../../utils/scenarioConfig';
 
-iinterface ShiftTimelineProps {
+interface ShiftTimelineProps {
   horasSemanais: 40 | 42 | 44;
   cenario: 'A' | 'B' | 'C' | 'D' | 'E' | 'F';
   customT1Entrada?: string;
