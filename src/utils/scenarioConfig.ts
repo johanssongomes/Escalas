@@ -14,7 +14,7 @@ export interface ScenarioDetails {
   gap: string;      // T3 -> T1
 }
 
-export const SCENARIO_MATRIX: Record<number, Record<'A' | 'B' | 'C' | 'D', ScenarioDetails>> = {
+export const SCENARIO_MATRIX: Record<number, Record<'A' | 'B' | 'C' | 'D' | 'E', ScenarioDetails>> = {
   40: {
     A: {
       t1: { entrada: '06:00', saida: '15:00', permanencia: '9h00', jornada: '8h00 + 1h intervalo' },
@@ -47,6 +47,14 @@ export const SCENARIO_MATRIX: Record<number, Record<'A' | 'B' | 'C' | 'D', Scena
       overlap1: '1h00',
       overlap2: '30 min',
       gap: '30 min sob.',
+    },
+    E: {
+      t1: { entrada: '07:00', saida: '16:00', permanencia: '9h00', jornada: '8h00 + 1h intervalo' },
+      t2: { entrada: '15:00', saida: '00:00', permanencia: '9h00', jornada: '8h00 + 1h intervalo' },
+      t3: { entrada: '23:00', saida: '07:00', permanencia: '8h00', jornada: '7h00 + 1h intervalo' },
+      overlap1: '1h00',
+      overlap2: '1h00',
+      gap: '0 min',
     },
   },
   42: {
@@ -82,6 +90,14 @@ export const SCENARIO_MATRIX: Record<number, Record<'A' | 'B' | 'C' | 'D', Scena
       overlap2: '54 min',
       gap: '54 min sob.',
     },
+    E: {
+      t1: { entrada: '07:00', saida: '16:24', permanencia: '9h24', jornada: '8h24 + 1h intervalo' },
+      t2: { entrada: '15:00', saida: '00:24', permanencia: '9h24', jornada: '8h24 + 1h intervalo' },
+      t3: { entrada: '23:00', saida: '07:24', permanencia: '8h24', jornada: '7h24 + 1h intervalo' },
+      overlap1: '1h24',
+      overlap2: '1h24',
+      gap: '24 min sob.',
+    },
   },
   44: {
     A: {
@@ -116,10 +132,18 @@ export const SCENARIO_MATRIX: Record<number, Record<'A' | 'B' | 'C' | 'D', Scena
       overlap2: '1h18',
       gap: '1h18 sob.',
     },
+    E: {
+      t1: { entrada: '07:00', saida: '16:48', permanencia: '9h48', jornada: '8h48 + 1h intervalo' },
+      t2: { entrada: '15:00', saida: '00:48', permanencia: '9h48', jornada: '8h48 + 1h intervalo' },
+      t3: { entrada: '23:00', saida: '07:48', permanencia: '8h48', jornada: '7h48 + 1h intervalo' },
+      overlap1: '1h48',
+      overlap2: '1h48',
+      gap: '48 min sob.',
+    },
   },
 };
 
-export function getScenarioDetails(hours: number, scenario: 'A' | 'B' | 'C' | 'D'): ScenarioDetails {
+export function getScenarioDetails(hours: number, scenario: 'A' | 'B' | 'C' | 'D' | 'E'): ScenarioDetails {
   const h = SCENARIO_MATRIX[hours] ? hours : 42;
   return SCENARIO_MATRIX[h][scenario];
 }

@@ -82,7 +82,7 @@ export interface ScheduleParams {
   consecutiveOffDays: number; // 2
   maxConsecutiveSundays: number; // 3
   horasSemanais: 40 | 42 | 44;
-  cenario: 'A' | 'B' | 'C' | 'D';
+  cenario: 'A' | 'B' | 'C' | 'D' | 'E';
   setor: 'comercio' | 'supermercado';
   month?: number; // 0-11 (Jan-Dec)
   year?: number;

@@ -5,7 +5,7 @@ import { getScenarioDetails } from '../../utils/scenarioConfig';
 
 interface ShiftTimelineProps {
   horasSemanais: 40 | 42 | 44;
-  cenario: 'A' | 'B' | 'C' | 'D';
+  cenario: 'A' | 'B' | 'C' | 'D' | 'E';
 }
 
 export const ShiftTimeline: React.FC<ShiftTimelineProps> = ({ horasSemanais, cenario }) => {

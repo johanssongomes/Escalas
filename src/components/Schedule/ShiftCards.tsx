@@ -20,7 +20,7 @@ const ShiftIcon = ({ id }: { id: string }) => {
 
 interface ShiftCardsProps {
   horasSemanais: 40 | 42 | 44;
-  cenario: 'A' | 'B' | 'C' | 'D';
+  cenario: 'A' | 'B' | 'C' | 'D' | 'E';
 }
 
 export const ShiftCards: React.FC<ShiftCardsProps> = ({ horasSemanais, cenario }) => {
