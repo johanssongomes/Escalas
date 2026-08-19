@@ -303,8 +303,12 @@ export const EscalaLookup: React.FC<EscalaLookupProps> = ({ colaboradores, param
                 <p className="text-xs text-slate-400 text-center py-4">Nenhum colaborador encontrado</p>
               ) : (
                 filteredColabs.map((colab) => {
-                  const letter = colab.team ? colab.team.replace('Equipe ', '') : 'A';
-                  const color = teamColorOf(LETTER_COLOR[letter] || 'indigo');
+                  const turnColorMap: Record<string, 'emerald' | 'amber' | 'violet'> = {
+                    T1: 'emerald',
+                    T2: 'amber',
+                    T3: 'violet',
+                  };
+                  const color = teamColorOf(turnColorMap[colab.turno] || 'gray');
                   return (
                     <button
                       key={colab.id}
