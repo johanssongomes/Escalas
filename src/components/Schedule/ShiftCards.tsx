@@ -89,7 +89,7 @@ export const ShiftCards: React.FC<ShiftCardsProps> = ({
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4 mb-4">
+            <div className="grid grid-cols-[1.25fr_0.75fr] gap-2 mb-4">
               <div>
                 <p className="text-xs opacity-75 font-medium mb-1">Entrada</p>
                 {cenario === 'F' ? (
@@ -104,7 +104,7 @@ export const ShiftCards: React.FC<ShiftCardsProps> = ({
                         else if (shift.id === 'T3') onParamsChange({ customT3Entrada: newTime });
                       }
                     }}
-                    className="w-full text-xl font-bold tracking-tight bg-white/60 dark:bg-slate-800/60 border border-pink-500/70 dark:border-pink-500/80 rounded-xl px-2 py-0.5 focus:outline-none focus:ring-2 focus:ring-pink-500/80 text-slate-800 dark:text-slate-100 shadow-inner"
+                    className="w-full text-lg font-bold tracking-tight bg-white/60 dark:bg-slate-800/60 border border-pink-500/70 dark:border-pink-500/80 rounded-xl px-1.5 py-0.5 focus:outline-none focus:ring-2 focus:ring-pink-500/80 text-slate-800 dark:text-slate-100 shadow-inner"
                   />
                 ) : (
                   <p className="text-xl font-bold tracking-tight">{shift.entrada}</p>
