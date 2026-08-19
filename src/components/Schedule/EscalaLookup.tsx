@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Search, Calendar, User, Users, Clock, Printer, ChevronLeft, ChevronRight } from 'lucide-react';
 import type { Colaborador, ScheduleParams, TeamConfig } from '../../types';
 import { generateIntelligentScale, DEFAULT_OPERATION, getMonthInfo } from '../../utils/escala52Engine';
@@ -43,6 +43,23 @@ export const EscalaLookup: React.FC<EscalaLookupProps> = ({ colaboradores, param
       return nameMatch && shiftMatch && teamMatch;
     });
   }, [colaboradores, searchQuery, selectedShift, selectedTeam]);
+
+  // 1.5 Unique teams list for dropdown based on the selected shift
+  const filteredTeamsForDropdown = useMemo(() => {
+    let list = teams;
+    if (selectedShift !== 'todos') {
+      list = teams.filter((t) => t.shiftType === selectedShift);
+    }
+    const uniqueNames = Array.from(new Set(list.map((t) => t.name)));
+    return uniqueNames.sort();
+  }, [teams, selectedShift]);
+
+  // Reset selected team when it's no longer present in the filtered teams list
+  useEffect(() => {
+    if (selectedTeam !== 'todas' && !filteredTeamsForDropdown.includes(selectedTeam)) {
+      setSelectedTeam('todas');
+    }
+  }, [filteredTeamsForDropdown, selectedTeam]);
 
   // Auto-select first collaborator if none selected
   useMemo(() => {
@@ -269,8 +286,8 @@ export const EscalaLookup: React.FC<EscalaLookupProps> = ({ colaboradores, param
               className="w-full text-xs bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-855 rounded-xl p-2 font-bold focus:ring-1 focus:ring-blue-500 focus:outline-none"
             >
               <option value="todas">Todas as Equipes</option>
-              {teams.map((t) => (
-                <option key={t.id} value={t.name}>{t.name}</option>
+              {filteredTeamsForDropdown.map((name) => (
+                <option key={name} value={name}>{name}</option>
               ))}
             </select>
           </div>
