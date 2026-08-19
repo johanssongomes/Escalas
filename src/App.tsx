@@ -1032,8 +1032,8 @@ function App() {
                     <h3 className="text-sm font-extrabold text-slate-800 dark:text-slate-200">2. Cenário de Turnos</h3>
                     <p className="text-xs text-slate-400 mt-0.5">Altere as sobreposições operacionais</p>
                   </div>
-                  <div className="flex bg-slate-100 dark:bg-slate-950 p-1 rounded-2xl border border-slate-200/50 dark:border-slate-850">
-                    {(['A', 'B', 'C', 'D', 'E'] as const).map((scen) => (
+                  <div className="flex bg-slate-100 dark:bg-slate-950 p-1 rounded-2xl border border-slate-200/50 dark:border-slate-850 flex-wrap gap-1">
+                    {(['A', 'B', 'C', 'D', 'E', 'F'] as const).map((scen) => (
                       <button
                         key={scen}
                         onClick={() => handleParamsChange({ ...params, cenario: scen })}
@@ -1053,12 +1053,25 @@ function App() {
 
             {/* Module 1: Shift Cards */}
             <section className="print-no-break">
-              <ShiftCards horasSemanais={params.horasSemanais} cenario={params.cenario} />
+              <ShiftCards
+                horasSemanais={params.horasSemanais}
+                cenario={params.cenario}
+                customT1Entrada={params.customT1Entrada}
+                customT2Entrada={params.customT2Entrada}
+                customT3Entrada={params.customT3Entrada}
+                onParamsChange={(newParams) => handleParamsChange({ ...params, ...newParams })}
+              />
             </section>
 
             {/* Overlap Timeline component */}
             <section className="print-no-break">
-              <ShiftTimeline horasSemanais={params.horasSemanais} cenario={params.cenario} />
+              <ShiftTimeline
+                horasSemanais={params.horasSemanais}
+                cenario={params.cenario}
+                customT1Entrada={params.customT1Entrada}
+                customT2Entrada={params.customT2Entrada}
+                customT3Entrada={params.customT3Entrada}
+              />
             </section>
 
             {/* Compliance & Labor Law Panel */}
@@ -1135,7 +1148,13 @@ function App() {
 
               {/* Timeline de sobreposições operacionais */}
               <div className="noprint">
-                <ShiftTimeline horasSemanais={params.horasSemanais} cenario={params.cenario} />
+                <ShiftTimeline
+                  horasSemanais={params.horasSemanais}
+                  cenario={params.cenario}
+                  customT1Entrada={params.customT1Entrada}
+                  customT2Entrada={params.customT2Entrada}
+                  customT3Entrada={params.customT3Entrada}
+                />
               </div>
 
               {/* Part 2: Interactive Grid */}

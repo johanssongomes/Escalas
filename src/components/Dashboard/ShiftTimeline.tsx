@@ -3,39 +3,130 @@ import { Clock, Info } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { getScenarioDetails } from '../../utils/scenarioConfig';
 
-interface ShiftTimelineProps {
+iinterface ShiftTimelineProps {
   horasSemanais: 40 | 42 | 44;
-  cenario: 'A' | 'B' | 'C' | 'D' | 'E';
+  cenario: 'A' | 'B' | 'C' | 'D' | 'E' | 'F';
+  customT1Entrada?: string;
+  customT2Entrada?: string;
+  customT3Entrada?: string;
 }
 
-export const ShiftTimeline: React.FC<ShiftTimelineProps> = ({ horasSemanais, cenario }) => {
-  const details = getScenarioDetails(horasSemanais, cenario);
+export const ShiftTimeline: React.FC<ShiftTimelineProps> = ({
+  horasSemanais,
+  cenario,
+  customT1Entrada,
+  customT2Entrada,
+  customT3Entrada,
+}) => {
+  const details = getScenarioDetails(horasSemanais, cenario, customT1Entrada, customT2Entrada, customT3Entrada);
 
-  // We represent the 24 hours as percentages (0 to 100)
-  const timeToPct = (timeStr: string): number => {
-    const [h, m] = timeStr.split(':').map(Number);
-    return ((h * 60 + m) / (24 * 60)) * 100;
+  const timeToMins = (t: string): number => {
+    const [h, m] = t.split(':').map(Number);
+    return (h || 0) * 60 + (m || 0);
   };
 
-  const t1Start = timeToPct(details.t1.entrada);
-  const t1End = timeToPct(details.t1.saida);
-  const t2Start = timeToPct(details.t2.entrada);
-  const t2End = timeToPct(details.t2.saida);
-  const t3Start = timeToPct(details.t3.entrada);
-  const t3End = timeToPct(details.t3.saida); // T3 wraps around midnight
+  const h = horasSemanais;
+  const dur1 = Math.round((h / 5 + 1) * 60);
+  const dur2 = Math.round((h / 5 + 1) * 60);
+  const dur3 = Math.round((h / 5) * 60);
+
+  const T1_start = timeToMins(details.t1.entrada);
+  const T1_end = T1_start + dur1;
+
+  let T2_start = timeToMins(details.t2.entrada);
+  if (T2_start < T1_start) {
+    T2_start += 24 * 60;
+  }
+  const T2_end = T2_start + dur2;
+
+  let T3_start = timeToMins(details.t3.entrada);
+  while (T3_start < T2_start) {
+    T3_start += 24 * 60;
+  }
+  const T3_end = T3_start + dur3;
+
+  const T1_next_start = T1_start + 24 * 60;
+
+  // Percentages for timeline track (normalized to 24h)
+  const t1Start = (T1_start / 1440) * 100 % 100;
+  const t1End = (T1_end / 1440) * 100;
+  const t2Start = (T2_start / 1440) * 100 % 100;
+  const t2End = (T2_end / 1440) * 100;
+  const t3Start = (T3_start / 1440) * 100 % 100;
+  const t3End = (T3_end / 1440) * 100;
+
+  // Helper to render shift bars that may wrap around midnight (width or end crosses 100%)
+  const renderShiftBar = (
+    label: string,
+    entrada: string,
+    saida: string,
+    startPct: number,
+    endPct: number,
+    bgClass: string
+  ) => {
+    const endPctNorm = endPct % 100;
+    const wraps = endPct > 100 || endPctNorm < startPct;
+
+    if (wraps) {
+      const seg1Width = 100 - startPct;
+      const seg2Width = endPctNorm;
+      return (
+        <>
+          {/* Segment 1: startPct to 100% */}
+          <motion.div
+            initial={{ width: 0 }}
+            animate={{ width: `${seg1Width}%` }}
+            transition={{ duration: 0.8 }}
+            className={`absolute h-full rounded-l-full bg-gradient-to-r ${bgClass} flex items-center justify-between px-3 text-[9px] font-extrabold text-white shadow-sm`}
+            style={{ left: `${startPct}%` }}
+          >
+            <span>{entrada}</span>
+            <span>{label}</span>
+            <span>24:00</span>
+          </motion.div>
+          {/* Segment 2: 00:00 to endPctNorm */}
+          <motion.div
+            initial={{ width: 0 }}
+            animate={{ width: `${seg2Width}%` }}
+            transition={{ duration: 0.8 }}
+            className={`absolute h-full rounded-r-full bg-gradient-to-r ${bgClass} flex items-center justify-between px-3 text-[9px] font-extrabold text-white shadow-sm`}
+            style={{ left: '0%' }}
+          >
+            <span>00:00</span>
+            <span>{label}</span>
+            <span>{saida}</span>
+          </motion.div>
+        </>
+      );
+    } else {
+      return (
+        <motion.div
+          initial={{ width: 0 }}
+          animate={{ width: `${endPct - startPct}%` }}
+          transition={{ duration: 0.8 }}
+          className={`absolute h-full rounded-full bg-gradient-to-r ${bgClass} flex items-center justify-between px-3 text-[9px] font-extrabold text-white shadow-sm`}
+          style={{ left: `${startPct}%` }}
+        >
+          <span>{entrada}</span>
+          <span>{label}</span>
+          <span>{saida}</span>
+        </motion.div>
+      );
+    }
+  };
 
   // Overlaps calculation
-  // Overlap 1 (T1 & T2): T2 starts at t2Start, T1 ends at t1End
-  const overlap1Start = t2Start;
-  const overlap1End = t1End;
+  const hasOverlap1 = T1_end > T2_start;
+  const overlap1Center = hasOverlap1 ? (((T2_start + Math.min(T1_end, T2_end)) / 2) / 1440 * 100) % 100 : 0;
 
-  // Overlap 2 (T2 & T3): T3 starts at 22:00, T2 ends at t2End
-  const overlap2Start = t3Start;
-  const overlap2End = t2End;
+  const hasOverlap2 = T2_end > T3_start;
+  const overlap2Center = hasOverlap2 ? (((T3_start + Math.min(T2_end, T3_end)) / 2) / 1440 * 100) % 100 : 0;
 
-  // Gap T3 -> T1: T3 ends at t3End, T1 starts at t1Start
-  const gapStart = t3End;
-  const gapEnd = t1Start;
+  const hasOverlap3 = T3_end > T1_next_start;
+  const overlap3Center = hasOverlap3 ? (((T1_next_start + T3_end) / 2) / 1440 * 100) % 100 : 0;
+
+  const hasGap3 = T3_end < T1_next_start && details.gap !== '0 min' && !details.gap.includes('sob.');
+  const gapCenter = hasGap3 ? (((T3_end + T1_next_start) / 2) / 1440 * 100) % 100 : 0;
 
   // Generate 24 hours labels
   const hours = Array.from({ length: 25 }, (_, i) => i);
@@ -90,17 +181,7 @@ export const ShiftTimeline: React.FC<ShiftTimelineProps> = ({ horasSemanais, cen
           <div className="relative h-6 flex items-center">
             <span className="absolute left-0 text-[10px] font-bold text-slate-400 w-16">T1 Matutino</span>
             <div className="w-full pl-20 relative h-full">
-              <motion.div
-                initial={{ width: 0 }}
-                animate={{ width: `${t1End - t1Start}%` }}
-                transition={{ duration: 0.8 }}
-                className="absolute h-full rounded-full bg-gradient-to-r from-emerald-400 to-emerald-500 flex items-center justify-between px-3 text-[9px] font-extrabold text-white shadow-sm"
-                style={{ left: `${t1Start}%` }}
-              >
-                <span>{details.t1.entrada}</span>
-                <span>1º Turno</span>
-                <span>{details.t1.saida}</span>
-              </motion.div>
+              {renderShiftBar('1º Turno', details.t1.entrada, details.t1.saida, t1Start, t1End, 'from-emerald-400 to-emerald-500')}
             </div>
           </div>
 
@@ -108,17 +189,7 @@ export const ShiftTimeline: React.FC<ShiftTimelineProps> = ({ horasSemanais, cen
           <div className="relative h-6 flex items-center">
             <span className="absolute left-0 text-[10px] font-bold text-slate-400 w-16">T2 Vespertino</span>
             <div className="w-full pl-20 relative h-full">
-              <motion.div
-                initial={{ width: 0 }}
-                animate={{ width: `${t2End - t2Start}%` }}
-                transition={{ duration: 0.8 }}
-                className="absolute h-full rounded-full bg-gradient-to-r from-orange-400 to-orange-500 flex items-center justify-between px-3 text-[9px] font-extrabold text-white shadow-sm"
-                style={{ left: `${t2Start}%` }}
-              >
-                <span>{details.t2.entrada}</span>
-                <span>2º Turno</span>
-                <span>{details.t2.saida}</span>
-              </motion.div>
+              {renderShiftBar('2º Turno', details.t2.entrada, details.t2.saida, t2Start, t2End, 'from-orange-400 to-orange-500')}
             </div>
           </div>
 
@@ -126,30 +197,7 @@ export const ShiftTimeline: React.FC<ShiftTimelineProps> = ({ horasSemanais, cen
           <div className="relative h-6 flex items-center">
             <span className="absolute left-0 text-[10px] font-bold text-slate-400 w-16">T3 Noturno</span>
             <div className="w-full pl-20 relative h-full">
-              {/* Segment 1: 22:00 to 24:00 */}
-              <motion.div
-                initial={{ width: 0 }}
-                animate={{ width: `${100 - t3Start}%` }}
-                transition={{ duration: 0.8 }}
-                className="absolute h-full rounded-l-full bg-gradient-to-r from-purple-400 to-purple-500 flex items-center justify-between px-3 text-[9px] font-extrabold text-white shadow-sm"
-                style={{ left: `${t3Start}%` }}
-              >
-                <span>{details.t3.entrada}</span>
-                <span>3º Turno</span>
-                <span>24:00</span>
-              </motion.div>
-              {/* Segment 2: 00:00 to morning */}
-              <motion.div
-                initial={{ width: 0 }}
-                animate={{ width: `${t3End}%` }}
-                transition={{ duration: 0.8 }}
-                className="absolute h-full rounded-r-full bg-gradient-to-r from-purple-500 to-purple-600 flex items-center justify-between px-3 text-[9px] font-extrabold text-white shadow-sm"
-                style={{ left: '0%' }}
-              >
-                <span>00:00</span>
-                <span>3º Turno</span>
-                <span>{details.t3.saida}</span>
-              </motion.div>
+              {renderShiftBar('3º Turno', details.t3.entrada, details.t3.saida, t3Start, t3End, 'from-purple-400 to-purple-500')}
             </div>
           </div>
         </div>
@@ -157,12 +205,11 @@ export const ShiftTimeline: React.FC<ShiftTimelineProps> = ({ horasSemanais, cen
         {/* Highlights / Overlaps annotation track */}
         <div className="relative h-12 mt-4 pl-20">
           {/* Overlap T1-T2 */}
-          {overlap1End > overlap1Start && (() => {
-            const center = (overlap1Start + overlap1End) / 2;
+          {hasOverlap1 && (() => {
             return (
               <div
                 className="absolute top-0 h-8 border border-dashed border-emerald-500/40 bg-emerald-500/5 dark:bg-emerald-400/5 text-center flex flex-col items-center justify-center rounded shadow-sm px-2"
-                style={{ left: `${center}%`, transform: 'translateX(-50%)', minWidth: '140px' }}
+                style={{ left: `${overlap1Center}%`, transform: 'translateX(-50%)', minWidth: '140px' }}
               >
                 <span className="text-[9px] font-black text-emerald-600 dark:text-emerald-400 whitespace-nowrap">Sobreposição T1/T2</span>
                 <span className="text-[8px] text-slate-500 dark:text-slate-400 whitespace-nowrap font-bold">{details.t2.entrada} - {details.t1.saida} ({details.overlap1})</span>
@@ -171,12 +218,11 @@ export const ShiftTimeline: React.FC<ShiftTimelineProps> = ({ horasSemanais, cen
           })()}
 
           {/* Overlap T2-T3 */}
-          {overlap2End > overlap2Start && (() => {
-            const center = (overlap2Start + overlap2End) / 2;
+          {hasOverlap2 && (() => {
             return (
               <div
                 className="absolute top-0 h-8 border border-dashed border-orange-500/40 bg-orange-500/5 dark:bg-orange-400/5 text-center flex flex-col items-center justify-center rounded shadow-sm px-2"
-                style={{ left: `${center}%`, transform: 'translateX(-50%)', minWidth: '140px' }}
+                style={{ left: `${overlap2Center}%`, transform: 'translateX(-50%)', minWidth: '140px' }}
               >
                 <span className="text-[9px] font-black text-orange-600 dark:text-orange-400 whitespace-nowrap">Sobreposição T2/T3</span>
                 <span className="text-[8px] text-slate-500 dark:text-slate-400 whitespace-nowrap font-bold">{details.t3.entrada} - {details.t2.saida} ({details.overlap2})</span>
@@ -185,12 +231,11 @@ export const ShiftTimeline: React.FC<ShiftTimelineProps> = ({ horasSemanais, cen
           })()}
 
           {/* Gap T3-T1 */}
-          {gapEnd > gapStart && details.gap !== '0 min' && (() => {
-            const center = (gapStart + gapEnd) / 2;
+          {hasGap3 && (() => {
             return (
               <div
                 className="absolute top-0 h-8 border border-dashed border-purple-500/40 bg-purple-500/5 dark:bg-purple-400/5 text-center flex flex-col items-center justify-center rounded shadow-sm px-2"
-                style={{ left: `${center}%`, transform: 'translateX(-50%)', minWidth: '120px' }}
+                style={{ left: `${gapCenter}%`, transform: 'translateX(-50%)', minWidth: '120px' }}
               >
                 <span className="text-[9px] font-black text-purple-600 dark:text-purple-400 whitespace-nowrap">Janela Sem Turno</span>
                 <span className="text-[8px] text-slate-500 dark:text-slate-400 whitespace-nowrap font-bold">{details.gap}</span>
@@ -198,13 +243,12 @@ export const ShiftTimeline: React.FC<ShiftTimelineProps> = ({ horasSemanais, cen
             );
           })()}
 
-          {/* Overlap T3-T1 (for scenarios like D where T1 starts before T3 ends) */}
-          {t3End > t1Start && (() => {
-            const center = (t1Start + t3End) / 2;
+          {/* Overlap T3-T1 (for scenarios like D or custom where T1 starts before T3 ends) */}
+          {hasOverlap3 && (() => {
             return (
               <div
                 className="absolute top-0 h-8 border border-dashed border-indigo-500/40 bg-indigo-500/5 dark:bg-indigo-400/5 text-center flex flex-col items-center justify-center rounded shadow-sm px-2"
-                style={{ left: `${center}%`, transform: 'translateX(-50%)', minWidth: '140px' }}
+                style={{ left: `${overlap3Center}%`, transform: 'translateX(-50%)', minWidth: '140px' }}
               >
                 <span className="text-[9px] font-black text-indigo-600 dark:text-indigo-400 whitespace-nowrap">Sobreposição T3/T1</span>
                 <span className="text-[8px] text-slate-500 dark:text-slate-400 whitespace-nowrap font-bold">{details.t1.entrada} - {details.t3.saida} ({details.gap.replace(' sob.', '')})</span>

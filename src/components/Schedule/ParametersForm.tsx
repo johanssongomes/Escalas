@@ -19,12 +19,15 @@ const schema = zod.object({
   consecutiveOffDays: zod.number().min(1, 'Mínimo 1').max(3, 'Máximo 3'),
   maxConsecutiveSundays: zod.number().min(1, 'Mínimo 1').max(5, 'Máximo 5'),
   horasSemanais: zod.union([zod.literal(40), zod.literal(42), zod.literal(44)]),
-  cenario: zod.union([zod.literal('A'), zod.literal('B'), zod.literal('C'), zod.literal('D')]),
+  cenario: zod.union([zod.literal('A'), zod.literal('B'), zod.literal('C'), zod.literal('D'), zod.literal('E'), zod.literal('F')]),
   setor: zod.union([zod.literal('comercio'), zod.literal('supermercado')]),
   month: zod.number().min(0).max(11).optional(),
   year: zod.number().min(2020).max(2035).optional(),
   maxConsecutiveWorkDays: zod.number().min(5).max(6).optional(),
   rotationSequence: zod.union([zod.literal('A'), zod.literal('B'), zod.literal('C')]).optional(),
+  customT1Entrada: zod.string().optional(),
+  customT2Entrada: zod.string().optional(),
+  customT3Entrada: zod.string().optional(),
 });
 
 interface ParametersFormProps {
@@ -42,6 +45,7 @@ export const ParametersForm: React.FC<ParametersFormProps> = ({
     register,
     watch,
     setValue,
+    getValues,
     formState: {},
   } = useForm<ScheduleParams>({
     resolver: zodResolver(schema),
@@ -59,6 +63,9 @@ export const ParametersForm: React.FC<ParametersFormProps> = ({
     if (initialValues.year !== undefined) setValue('year', initialValues.year);
     setValue('maxConsecutiveWorkDays', initialValues.maxConsecutiveWorkDays ?? 6);
     setValue('rotationSequence', initialValues.rotationSequence ?? 'A');
+    setValue('customT1Entrada', initialValues.customT1Entrada);
+    setValue('customT2Entrada', initialValues.customT2Entrada);
+    setValue('customT3Entrada', initialValues.customT3Entrada);
 
     if (initialValues.month !== undefined && initialValues.month !== -1 && initialValues.year !== undefined) {
       const calculatedDays = getMonthInfo(initialValues.year, initialValues.month).dias;
@@ -308,11 +315,14 @@ export const ParametersForm: React.FC<ParametersFormProps> = ({
                   <p className="text-[10px] text-slate-400 mt-0.5">Altere as sobreposições operacionais</p>
                 </div>
                 <div className="flex bg-slate-100 dark:bg-slate-950 p-1 rounded-xl border border-slate-200/50 dark:border-slate-850">
-                  {(['A', 'B', 'C', 'D', 'E'] as const).map((scen) => (
+                  {(['A', 'B', 'C', 'D', 'E', 'F'] as const).map((scen) => (
                     <button
                       key={scen}
                       type="button"
-                      onClick={() => setValue('cenario', scen)}
+                      onClick={() => {
+                        setValue('cenario', scen);
+                        onChange(getValues());
+                      }}
                       className={`px-3 py-1 rounded-lg text-[10px] font-black transition duration-200 cursor-pointer ${
                         watchedValues.cenario === scen
                           ? 'bg-orange-500 text-white shadow-sm'
@@ -327,7 +337,19 @@ export const ParametersForm: React.FC<ParametersFormProps> = ({
             </div>
 
             {/* Cards de jornada por turno */}
-            <ShiftCards horasSemanais={watchedValues.horasSemanais || 42} cenario={watchedValues.cenario || 'A'} />
+            <ShiftCards
+              horasSemanais={watchedValues.horasSemanais || 42}
+              cenario={watchedValues.cenario || 'A'}
+              customT1Entrada={watchedValues.customT1Entrada}
+              customT2Entrada={watchedValues.customT2Entrada}
+              customT3Entrada={watchedValues.customT3Entrada}
+              onParamsChange={(newParams) => {
+                Object.entries(newParams).forEach(([k, v]) => {
+                  setValue(k as any, v);
+                });
+                onChange(getValues());
+              }}
+            />
           </div>
         </div>
 

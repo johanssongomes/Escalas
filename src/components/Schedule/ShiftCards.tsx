@@ -1,7 +1,7 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { Sun, Sunset, Moon, Info, Clock, ShieldAlert } from 'lucide-react';
-import type { ShiftDefinition } from '../../types';
+import type { ShiftDefinition, ScheduleParams } from '../../types';
 
 import { getScenarioDetails } from '../../utils/scenarioConfig';
 
@@ -20,11 +20,22 @@ const ShiftIcon = ({ id }: { id: string }) => {
 
 interface ShiftCardsProps {
   horasSemanais: 40 | 42 | 44;
-  cenario: 'A' | 'B' | 'C' | 'D' | 'E';
+  cenario: 'A' | 'B' | 'C' | 'D' | 'E' | 'F';
+  customT1Entrada?: string;
+  customT2Entrada?: string;
+  customT3Entrada?: string;
+  onParamsChange?: (newParams: Partial<ScheduleParams>) => void;
 }
 
-export const ShiftCards: React.FC<ShiftCardsProps> = ({ horasSemanais, cenario }) => {
-  const details = getScenarioDetails(horasSemanais, cenario);
+export const ShiftCards: React.FC<ShiftCardsProps> = ({
+  horasSemanais,
+  cenario,
+  customT1Entrada,
+  customT2Entrada,
+  customT3Entrada,
+  onParamsChange,
+}) => {
+  const details = getScenarioDetails(horasSemanais, cenario, customT1Entrada, customT2Entrada, customT3Entrada);
 
   const dynamicShifts: ShiftDefinition[] = [
     {
@@ -80,11 +91,27 @@ export const ShiftCards: React.FC<ShiftCardsProps> = ({ horasSemanais, cenario }
 
             <div className="grid grid-cols-2 gap-4 mb-4">
               <div>
-                <p className="text-xs opacity-75 font-medium">Entrada</p>
-                <p className="text-xl font-bold tracking-tight">{shift.entrada}</p>
+                <p className="text-xs opacity-75 font-medium mb-1">Entrada</p>
+                {cenario === 'F' ? (
+                  <input
+                    type="time"
+                    value={shift.entrada}
+                    onChange={(e) => {
+                      const newTime = e.target.value;
+                      if (onParamsChange) {
+                        if (shift.id === 'T1') onParamsChange({ customT1Entrada: newTime });
+                        else if (shift.id === 'T2') onParamsChange({ customT2Entrada: newTime });
+                        else if (shift.id === 'T3') onParamsChange({ customT3Entrada: newTime });
+                      }
+                    }}
+                    className="w-full text-xl font-bold tracking-tight bg-white/60 dark:bg-slate-800/60 border border-pink-500/70 dark:border-pink-500/80 rounded-xl px-2 py-0.5 focus:outline-none focus:ring-2 focus:ring-pink-500/80 text-slate-800 dark:text-slate-100 shadow-inner"
+                  />
+                ) : (
+                  <p className="text-xl font-bold tracking-tight">{shift.entrada}</p>
+                )}
               </div>
               <div>
-                <p className="text-xs opacity-75 font-medium">Saída</p>
+                <p className="text-xs opacity-75 font-medium mb-1">Saída</p>
                 <p className="text-xl font-bold tracking-tight">{shift.saida}</p>
               </div>
             </div>

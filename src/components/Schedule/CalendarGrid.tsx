@@ -1242,7 +1242,10 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
                       // Horários reais do turno a partir do cenário configurado
                       const scenarioDetails = getScenarioDetails(
                         params?.horasSemanais ?? 42,
-                        params?.cenario ?? 'A'
+                        params?.cenario ?? 'A',
+                        params?.customT1Entrada,
+                        params?.customT2Entrada,
+                        params?.customT3Entrada
                       );
                       const shiftTimes = currentShift === 'T1' ? scenarioDetails.t1
                         : currentShift === 'T2' ? scenarioDetails.t2
@@ -1426,7 +1429,10 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
                       {(() => {
                         const consolidatedScenario = getScenarioDetails(
                           params?.horasSemanais ?? 42,
-                          params?.cenario ?? 'A'
+                          params?.cenario ?? 'A',
+                          params?.customT1Entrada,
+                          params?.customT2Entrada,
+                          params?.customT3Entrada
                         );
                         const consolidatedTimes = shift === 'T1' ? consolidatedScenario.t1
                           : shift === 'T2' ? consolidatedScenario.t2
