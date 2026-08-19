@@ -76,7 +76,7 @@ export const EquidadeCard: React.FC<EquidadeCardProps> = ({ data, annualData, mo
       )}
 
       <div className="space-y-2">
-        {rows.map(row => {
+        {rows.filter(row => row.members > 0).map(row => {
           const color = teamColorOf(LETTER_COLOR[row.letter]);
           const pctColor = row.percentualEquilibrio >= 85
             ? 'text-emerald-600 dark:text-emerald-400'
