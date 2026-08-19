@@ -12,7 +12,8 @@
     "preview": "vite preview",
     "db:studio": "prisma studio",
     "db:push": "prisma db push",
-    "db:migrate": "tsx scripts/migrate-supabase-to-local.ts"
+    "db:migrate": "tsx scripts/migrate-supabase-to-local.ts",
+    "db:push-supabase": "tsx scripts/migrate-local-to-supabase.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.4.0",
