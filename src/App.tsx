@@ -4,9 +4,10 @@ import { CalendarGrid } from './components/Schedule/CalendarGrid';
 import { generateSchedule } from './utils/scheduleEngine';
 import { generateIntelligentScale, buildCanonicalTeams, DEFAULT_OPERATION, getMonthInfo, letterFromName, TEAM_LETTERS } from './utils/escala52Engine';
 import type { ScheduleParams, Colaborador, TeamConfig, DayStatus, ShiftType, DadosMes, DadosMensais, OperationConfig, TeamLetter } from './types';
-import { ShieldCheck, Truck, Moon, Sun, Calendar, BarChart3, Upload } from 'lucide-react';
+import { ShieldCheck, Truck, Moon, Sun, Calendar, BarChart3, Upload, Search } from 'lucide-react';
 import { ImportModal } from './components/Schedule/ImportModal';
 import { ScaleValidator } from './components/Schedule/ScaleValidator';
+import { EscalaLookup } from './components/Schedule/EscalaLookup';
 
 import { ShiftCards } from './components/Schedule/ShiftCards';
 import { CompliancePanel } from './components/Schedule/CompliancePanel';
@@ -145,7 +146,7 @@ function App() {
 
   const [colaboradores, setColaboradores] = useState<Colaborador[]>([]);
 
-  const [activeTab, setActiveTab] = useState<'painel' | 'planejador'>('planejador');
+  const [activeTab, setActiveTab] = useState<'painel' | 'planejador' | 'consulta'>('planejador');
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [activeScenarioName, setActiveScenarioName] = useState<string | undefined>(undefined);
   const [activeScenarioId, setActiveScenarioId] = useState<number | undefined>(undefined);
@@ -996,9 +997,20 @@ function App() {
             <Calendar className="w-4 h-4" />
             Calendário & Planejamento
           </button>
+          <button
+            onClick={() => setActiveTab('consulta')}
+            className={`pb-3 text-sm font-bold transition relative flex items-center gap-2 cursor-pointer ${
+              activeTab === 'consulta'
+                ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400'
+                : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'
+            }`}
+          >
+            <Search className="w-4 h-4" />
+            Consultar Escala
+          </button>
         </div>
 
-        {activeTab === 'painel' ? (
+        {activeTab === 'painel' && (
           <>
             {/* Filtro do Modelo de Carga Horária Semanal e Cenários */}
             <section className="noprint">
@@ -1110,7 +1122,9 @@ function App() {
               <CoverageTable dailyCoverage={dailyCoverage} weeklyCoverage={weeklyCoverage} />
             </section>
           </>
-        ) : (
+        )}
+
+        {activeTab === 'planejador' && (
           <>
             {/* Unified Planning & Scale Card (Module 2, 4 & 9) */}
             <section className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 shadow-sm mb-8 space-y-6 print-break-after">
@@ -1203,6 +1217,14 @@ function App() {
               />
             </section>
           </>
+        )}
+
+        {activeTab === 'consulta' && (
+          <EscalaLookup
+            colaboradores={colaboradores}
+            params={params}
+            teams={teams}
+          />
         )}
 
         <ImportModal
