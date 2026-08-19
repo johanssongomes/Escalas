@@ -6,6 +6,7 @@ import { Settings, Users, Calendar, Sparkles, Info } from 'lucide-react';
 import type { ScheduleParams } from '../../types';
 import { getMonthInfo } from '../../utils/escala52Engine';
 import { MonthNavigator } from './MonthNavigator';
+import { ShiftCards } from './ShiftCards';
 // const MONTH_NAMES = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
 
 const schema = zod.object({
@@ -23,7 +24,7 @@ const schema = zod.object({
   month: zod.number().min(0).max(11).optional(),
   year: zod.number().min(2020).max(2035).optional(),
   maxConsecutiveWorkDays: zod.number().min(5).max(6).optional(),
-  rotationSequence: zod.union([zod.literal('A'), zod.literal('B')]).optional(),
+  rotationSequence: zod.union([zod.literal('A'), zod.literal('B'), zod.literal('C')]).optional(),
 });
 
 interface ParametersFormProps {
@@ -141,135 +142,196 @@ export const ParametersForm: React.FC<ParametersFormProps> = ({
   const renderFormContent = () => (
     <form className="space-y-4">
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {/* Section: Workers Count */}
-        <div className="space-y-3 p-3 bg-slate-50/70 dark:bg-slate-950/20 rounded-xl border border-slate-100 dark:border-slate-800/80">
-          <h3 className="text-xs font-bold flex items-center gap-1.5 text-slate-700 dark:text-slate-305">
-            <Users className="w-3.5 h-3.5 text-emerald-500" />
-            Equipe (Conferentes)
-          </h3>
-          
-          <div className="space-y-2.5">
-            <div>
-              <div className="flex justify-between text-[11px] mb-0.5 font-semibold">
-                <span className="text-emerald-700 dark:text-emerald-400">1º Turno (T1)</span>
-                <span className="text-slate-550 dark:text-slate-400 font-bold">{watchedValues.conferentesT1} colabs</span>
+        {/* Lado Esquerdo (2 colunas) contendo Conferentes, Período e Jornada */}
+        <div className="md:col-span-2 space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Section: Workers Count */}
+            <div className="space-y-3 p-3 bg-slate-50/70 dark:bg-slate-950/20 rounded-xl border border-slate-100 dark:border-slate-800/80">
+              <h3 className="text-xs font-bold flex items-center gap-1.5 text-slate-700 dark:text-slate-305">
+                <Users className="w-3.5 h-3.5 text-emerald-500" />
+                Equipe (Conferentes)
+              </h3>
+              
+              <div className="space-y-2.5">
+                <div>
+                  <div className="flex justify-between text-[11px] mb-0.5 font-semibold">
+                    <span className="text-emerald-700 dark:text-emerald-400">1º Turno (T1)</span>
+                    <span className="text-slate-550 dark:text-slate-400 font-bold">{watchedValues.conferentesT1} colabs</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="1"
+                    max="50"
+                    className="w-full h-1 bg-emerald-200 dark:bg-emerald-950 rounded-lg appearance-none cursor-pointer accent-emerald-500"
+                    {...register('conferentesT1', { valueAsNumber: true })}
+                  />
+                </div>
+
+                <div>
+                  <div className="flex justify-between text-[11px] mb-0.5 font-semibold">
+                    <span className="text-orange-700 dark:text-orange-400">2º Turno (T2)</span>
+                    <span className="text-slate-550 dark:text-slate-400 font-bold">{watchedValues.conferentesT2} colabs</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="1"
+                    max="50"
+                    className="w-full h-1 bg-orange-200 dark:bg-orange-950 rounded-lg appearance-none cursor-pointer accent-orange-500"
+                    {...register('conferentesT2', { valueAsNumber: true })}
+                  />
+                </div>
+
+                <div>
+                  <div className="flex justify-between text-[11px] mb-0.5 font-semibold">
+                    <span className="text-purple-700 dark:text-purple-400">3º Turno (T3)</span>
+                    <span className="text-slate-550 dark:text-slate-400 font-bold">{watchedValues.conferentesT3} colabs</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="1"
+                    max="50"
+                    className="w-full h-1 bg-purple-200 dark:bg-purple-950 rounded-lg appearance-none cursor-pointer accent-purple-500"
+                    {...register('conferentesT3', { valueAsNumber: true })}
+                  />
+                </div>
               </div>
-              <input
-                type="range"
-                min="1"
-                max="50"
-                className="w-full h-1 bg-emerald-200 dark:bg-emerald-950 rounded-lg appearance-none cursor-pointer accent-emerald-500"
-                {...register('conferentesT1', { valueAsNumber: true })}
-              />
             </div>
 
-            <div>
-              <div className="flex justify-between text-[11px] mb-0.5 font-semibold">
-                <span className="text-orange-700 dark:text-orange-400">2º Turno (T2)</span>
-                <span className="text-slate-550 dark:text-slate-400 font-bold">{watchedValues.conferentesT2} colabs</span>
+            {/* Section: Period Constraints */}
+            <div className="space-y-3 p-3 bg-slate-50/70 dark:bg-slate-950/20 rounded-xl border border-slate-100 dark:border-slate-800/80">
+              <div className="flex items-center justify-between">
+                <h3 className="text-xs font-bold flex items-center gap-1.5 text-slate-700 dark:text-slate-305">
+                  <Calendar className="w-3.5 h-3.5 text-blue-500" />
+                  Período & Regras
+                </h3>
+                <span className="text-[8px] font-black text-slate-500 dark:text-slate-400 bg-slate-200/60 dark:bg-slate-800 px-1.5 py-0.5 rounded">
+                  Escala 5x2 | 2 Folgas
+                </span>
               </div>
-              <input
-                type="range"
-                min="1"
-                max="50"
-                className="w-full h-1 bg-orange-200 dark:bg-orange-950 rounded-lg appearance-none cursor-pointer accent-orange-500"
-                {...register('conferentesT2', { valueAsNumber: true })}
-              />
+
+              <div className="grid grid-cols-2 gap-2.5">
+                <div className="col-span-2">
+                  <label className="block text-[10px] font-bold text-slate-400 mb-0.5">Mês de Referência</label>
+                  <MonthNavigator
+                    month={watchedValues.month}
+                    year={watchedValues.year}
+                    onChangeMonthYear={(newM, newY, calculatedDays, calculatedWeeks) => {
+                      setValue('month', newM);
+                      setValue('year', newY);
+                      setValue('dias', calculatedDays);
+                      setValue('weeks', calculatedWeeks);
+                      onChange({
+                        ...watchedValues,
+                        month: newM,
+                        year: newY,
+                        dias: calculatedDays,
+                        weeks: calculatedWeeks,
+                      } as ScheduleParams);
+                    }}
+                    variant="form"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-400 mb-0.5">Semanas</label>
+                  <select
+                    className="w-full text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-1.5 focus:ring-1 focus:ring-blue-500 font-bold disabled:opacity-60 disabled:bg-slate-50 dark:disabled:bg-slate-950/40 disabled:cursor-not-allowed"
+                    {...register('weeks', { valueAsNumber: true })}
+                    disabled={watchedValues.month !== -1}
+                  >
+                    <option value={2}>2 semanas</option>
+                    <option value={4}>4 semanas</option>
+                    <option value={5}>5 semanas</option>
+                    <option value={6}>6 semanas</option>
+                    <option value={8}>8 semanas</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-400 mb-0.5">Dias Totais</label>
+                  <input
+                    type="number"
+                    min={7}
+                    max={84}
+                    className="w-full text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-1.5 font-bold focus:ring-1 focus:ring-blue-500 disabled:opacity-60 disabled:bg-slate-50 dark:disabled:bg-slate-950/40 disabled:cursor-not-allowed"
+                    {...register('dias', { valueAsNumber: true })}
+                    disabled={watchedValues.month !== -1}
+                  />
+                </div>
+
+                <div className="col-span-2">
+                  <label className="block text-[10px] font-bold text-slate-400 mb-0.5">Carga Horária Semanal</label>
+                  <select
+                    className="w-full text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-1.5 focus:ring-1 focus:ring-blue-500 font-bold"
+                    {...register('horasSemanais', { valueAsNumber: true })}
+                  >
+                    <option value={40}>40 horas (8h/dia)</option>
+                    <option value={42}>42 horas (8h24/dia - Padrão)</option>
+                    <option value={44}>44 horas (8h48/dia)</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Section: Jornada & Cenários de Turnos */}
+          <div className="space-y-4 p-4 bg-slate-50/50 dark:bg-slate-950/20 rounded-2xl border border-slate-100 dark:border-slate-850 flex flex-col justify-between">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-sm">
+              {/* Carga Horária */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  <h3 className="text-xs font-black text-slate-800 dark:text-slate-200">1. Jornada Semanal</h3>
+                  <p className="text-[10px] text-slate-400 mt-0.5">Defina a carga horária base</p>
+                </div>
+                <div className="flex bg-slate-100 dark:bg-slate-950 p-1 rounded-xl border border-slate-200/50 dark:border-slate-850">
+                  {([40, 42, 44] as const).map((hours) => (
+                    <button
+                      key={hours}
+                      type="button"
+                      onClick={() => setValue('horasSemanais', hours)}
+                      className={`px-3 py-1 rounded-lg text-[10px] font-black transition duration-200 cursor-pointer ${
+                        watchedValues.horasSemanais === hours
+                          ? 'bg-blue-600 text-white shadow-sm'
+                          : 'text-slate-600 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200'
+                      }`}
+                    >
+                      {hours} Horas
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Cenário de Sobreposição */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-t md:border-t-0 md:border-l border-slate-100 dark:border-slate-800 pt-3 md:pt-0 md:pl-4">
+                <div>
+                  <h3 className="text-xs font-black text-slate-800 dark:text-slate-200">2. Cenário de Turnos</h3>
+                  <p className="text-[10px] text-slate-400 mt-0.5">Altere as sobreposições operacionais</p>
+                </div>
+                <div className="flex bg-slate-100 dark:bg-slate-950 p-1 rounded-xl border border-slate-200/50 dark:border-slate-850">
+                  {(['A', 'B', 'C', 'D'] as const).map((scen) => (
+                    <button
+                      key={scen}
+                      type="button"
+                      onClick={() => setValue('cenario', scen)}
+                      className={`px-3 py-1 rounded-lg text-[10px] font-black transition duration-200 cursor-pointer ${
+                        watchedValues.cenario === scen
+                          ? 'bg-orange-500 text-white shadow-sm'
+                          : 'text-slate-600 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200'
+                      }`}
+                    >
+                      Cenário {scen}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
 
-            <div>
-              <div className="flex justify-between text-[11px] mb-0.5 font-semibold">
-                <span className="text-purple-700 dark:text-purple-400">3º Turno (T3)</span>
-                <span className="text-slate-550 dark:text-slate-400 font-bold">{watchedValues.conferentesT3} colabs</span>
-              </div>
-              <input
-                type="range"
-                min="1"
-                max="50"
-                className="w-full h-1 bg-purple-200 dark:bg-purple-950 rounded-lg appearance-none cursor-pointer accent-purple-500"
-                {...register('conferentesT3', { valueAsNumber: true })}
-              />
-            </div>
+            {/* Cards de jornada por turno */}
+            <ShiftCards horasSemanais={watchedValues.horasSemanais || 42} cenario={watchedValues.cenario || 'A'} />
           </div>
         </div>
 
-        {/* Section: Period Constraints */}
-        <div className="space-y-3 p-3 bg-slate-50/70 dark:bg-slate-950/20 rounded-xl border border-slate-100 dark:border-slate-800/80">
-          <div className="flex items-center justify-between">
-            <h3 className="text-xs font-bold flex items-center gap-1.5 text-slate-700 dark:text-slate-305">
-              <Calendar className="w-3.5 h-3.5 text-blue-500" />
-              Período & Regras
-            </h3>
-            <span className="text-[8px] font-black text-slate-500 dark:text-slate-400 bg-slate-200/60 dark:bg-slate-800 px-1.5 py-0.5 rounded">
-              Escala 5x2 | 2 Folgas
-            </span>
-          </div>
-
-          <div className="grid grid-cols-2 gap-2.5">
-            <div className="col-span-2">
-              <label className="block text-[10px] font-bold text-slate-400 mb-0.5">Mês de Referência</label>
-              <MonthNavigator
-                month={watchedValues.month}
-                year={watchedValues.year}
-                onChangeMonthYear={(newM, newY, calculatedDays, calculatedWeeks) => {
-                  setValue('month', newM);
-                  setValue('year', newY);
-                  setValue('dias', calculatedDays);
-                  setValue('weeks', calculatedWeeks);
-                  onChange({
-                    ...watchedValues,
-                    month: newM,
-                    year: newY,
-                    dias: calculatedDays,
-                    weeks: calculatedWeeks,
-                  } as ScheduleParams);
-                }}
-                variant="form"
-              />
-            </div>
-
-            <div>
-              <label className="block text-[10px] font-bold text-slate-400 mb-0.5">Semanas</label>
-              <select
-                className="w-full text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-1.5 focus:ring-1 focus:ring-blue-500 font-bold disabled:opacity-60 disabled:bg-slate-50 dark:disabled:bg-slate-950/40 disabled:cursor-not-allowed"
-                {...register('weeks', { valueAsNumber: true })}
-                disabled={watchedValues.month !== -1}
-              >
-                <option value={2}>2 semanas</option>
-                <option value={4}>4 semanas</option>
-                <option value={5}>5 semanas</option>
-                <option value={6}>6 semanas</option>
-                <option value={8}>8 semanas</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-[10px] font-bold text-slate-400 mb-0.5">Dias Totais</label>
-              <input
-                type="number"
-                min={7}
-                max={84}
-                className="w-full text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-1.5 font-bold focus:ring-1 focus:ring-blue-500 disabled:opacity-60 disabled:bg-slate-50 dark:disabled:bg-slate-950/40 disabled:cursor-not-allowed"
-                {...register('dias', { valueAsNumber: true })}
-                disabled={watchedValues.month !== -1}
-              />
-            </div>
-
-            <div className="col-span-2">
-              <label className="block text-[10px] font-bold text-slate-400 mb-0.5">Carga Horária Semanal</label>
-              <select
-                className="w-full text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-1.5 focus:ring-1 focus:ring-blue-500 font-bold"
-                {...register('horasSemanais', { valueAsNumber: true })}
-              >
-                <option value={40}>40 horas (8h/dia)</option>
-                <option value={42}>42 horas (8h24/dia - Padrão)</option>
-                <option value={44}>44 horas (8h48/dia)</option>
-              </select>
-            </div>
-          </div>
-        </div>
-
-        {/* Section: Advanced Rules */}
+        {/* Section: Advanced Rules (Lado Direito - 1 coluna) */}
         <div className="space-y-3 p-3 bg-slate-50/70 dark:bg-slate-950/20 rounded-xl border border-slate-100 dark:border-slate-800/80">
           <h3 className="text-xs font-bold flex items-center gap-1.5 text-slate-700 dark:text-slate-305">
             <Sparkles className="w-3.5 h-3.5 text-orange-500" />
@@ -321,6 +383,7 @@ export const ParametersForm: React.FC<ParametersFormProps> = ({
               >
                 <option value="A">Rotação A (100% CLT Feminina - Folga Domingo 1x1)</option>
                 <option value="B">Rotação B (Operação Contínua - Folga Domingo 1x2)</option>
+                <option value="C">Rotação C (Osvaldo — Redução Custo FDS)</option>
               </select>
             </div>
 
@@ -328,18 +391,25 @@ export const ParametersForm: React.FC<ParametersFormProps> = ({
               const maxWorkDays = watchedValues.maxConsecutiveWorkDays ?? 6;
               const rotation = watchedValues.rotationSequence ?? 'A';
               
-              const exp = rotation === 'B'
+              const exp = rotation === 'C'
+                ? {
+                    title: 'Rotação C — Osvaldo (Redução FDS)',
+                    badge: 'Redução de Custo',
+                    color: 'green' as const,
+                    desc: `SÁBADO: T1 trabalha • T2 folga • T3 folga. DOMINGO: T1 folga • T2 trabalha • T3 trabalha. Menos turnos simultâneos no fim de semana reduz custo com fretado e alimentação. Dias úteis seguem rotação A.`,
+                  }
+                : rotation === 'B'
                 ? (maxWorkDays === 5
                   ? {
                       title: 'Rotação B + Limite de 5 Dias',
                       badge: 'Operação Contínua',
-                      color: 'blue',
+                      color: 'blue' as const,
                       desc: 'Nesta rotação, a sequência natural de trabalho nunca passa de 5 dias seguidos (Folga Dom/Seg → Sáb/Dom → Qui/Sex → Ter/Qua). A escala permanece natural e otimizada.'
                     }
                   : {
                       title: 'Rotação B + Limite de 6 Dias',
                       badge: 'Operação Contínua',
-                      color: 'blue',
+                      color: 'blue' as const,
                       desc: 'Como a Rotação B já possui no máximo 5 dias de trabalho consecutivos por natureza, o limite de 6 dias não gera nenhuma alteração prática ou quebra na escala.'
                     }
                 )
@@ -347,13 +417,13 @@ export const ParametersForm: React.FC<ParametersFormProps> = ({
                   ? {
                       title: 'Rotação A + Limite de 5 Dias',
                       badge: '100% CLT Feminina',
-                      color: 'amber',
+                      color: 'amber' as const,
                       desc: 'A transição Qui/Sex → Sáb/Dom geraria 7 dias de trabalho seguidos. Com limite de 5 dias, o sistema quebra essa sequência inserindo folgas intermediárias.'
                     }
                   : {
                       title: 'Rotação A + Limite de 6 Dias',
                       badge: '100% CLT Feminina',
-                      color: 'amber',
+                      color: 'amber' as const,
                       desc: 'Evita os 7 dias de trabalho consecutivos na transição Qui/Sex → Sáb/Dom. O sistema insere um limite de 6 dias, gerando um final de semana longo de 3 dias.'
                     }
                 );
@@ -366,21 +436,61 @@ export const ParametersForm: React.FC<ParametersFormProps> = ({
                     <span className={`ml-auto text-[9px] px-1.5 py-0.5 rounded-full font-bold ${
                       exp.color === 'blue'
                         ? 'bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400'
-                        : 'bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400'
+                        : exp.color === 'green'
+                          ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400'
+                          : 'bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400'
                     }`}>
                       {exp.badge}
                     </span>
                   </div>
-                  <p className="text-slate-500 dark:text-slate-400 leading-relaxed font-semibold">
-                    {exp.desc}
-                  </p>
+                  {rotation === 'C' ? (
+                    <div className="space-y-1.5 mt-1">
+                      <div className="grid grid-cols-2 gap-1.5">
+                        <div className="rounded-md p-1.5 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-900">
+                          <p className="text-[9px] font-black text-emerald-700 dark:text-emerald-400 uppercase tracking-wide mb-0.5">Sábado</p>
+                          <p className="text-[9px] font-bold text-slate-600 dark:text-slate-300">✅ T1 trabalha <span className="text-[8px] text-slate-400">(manhã)</span></p>
+                          <p className="text-[9px] font-bold text-slate-600 dark:text-slate-300">❌ T2 folga</p>
+                          <p className="text-[9px] font-bold text-slate-600 dark:text-slate-300">✅ T3 trabalha <span className="text-[8px] text-slate-400">(entrada Sex)</span></p>
+                        </div>
+                        <div className="rounded-md p-1.5 bg-indigo-50 dark:bg-indigo-950/30 border border-indigo-200 dark:border-indigo-900">
+                          <p className="text-[9px] font-black text-indigo-700 dark:text-indigo-400 uppercase tracking-wide mb-0.5">Domingo</p>
+                          <p className="text-[9px] font-bold text-slate-600 dark:text-slate-300">❌ T1 folga</p>
+                          <p className="text-[9px] font-bold text-amber-600 dark:text-amber-400">🔄 T2 <span className="text-[8px]">rodízio equipes</span></p>
+                          <p className="text-[9px] font-bold text-slate-600 dark:text-slate-300">❌ T3 folga <span className="text-[8px] text-slate-400">(não trabalha Sáb→Dom)</span></p>
+                        </div>
+                      </div>
+                      {/* T2 Sunday rotation detail */}
+                      <div className="rounded-md p-2 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900 space-y-1">
+                        <p className="text-[9px] font-black text-amber-700 dark:text-amber-400 uppercase tracking-wide">T2 — Rodízio Domingo por Equipe</p>
+                        <div className="grid grid-cols-2 gap-1">
+                          <div>
+                            <p className="text-[8.5px] font-black text-slate-600 dark:text-slate-300">Semana PAR</p>
+                            <p className="text-[8px] font-bold text-slate-500 dark:text-slate-400">✅ Eqs A + C trabalham</p>
+                            <p className="text-[8px] font-bold text-slate-500 dark:text-slate-400">❌ Eqs B + D folgam</p>
+                          </div>
+                          <div>
+                            <p className="text-[8.5px] font-black text-slate-600 dark:text-slate-300">Semana ÍMPAR</p>
+                            <p className="text-[8px] font-bold text-slate-500 dark:text-slate-400">❌ Eqs A + C folgam</p>
+                            <p className="text-[8px] font-bold text-slate-500 dark:text-slate-400">✅ Eqs B + D trabalham</p>
+                          </div>
+                        </div>
+                      </div>
+                      <p className="text-[8.5px] text-slate-400 dark:text-slate-500 italic leading-relaxed">
+                        T3: entrada sexta = turno contado no Sábado. Folga Domingo (não trabalha Sáb→Dom). T2: cada equipe folga ~50% dos domingos.
+                      </p>
+                    </div>
+                  ) : (
+                    <p className="text-slate-500 dark:text-slate-400 leading-relaxed font-semibold">
+                      {exp.desc}
+                    </p>
+                  )}
                 </div>
               );
             })()}
-          </div>
         </div>
       </div>
-    </form>
+    </div>
+  </form>
   );
 
   if (plain) {

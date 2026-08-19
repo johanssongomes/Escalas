@@ -9,6 +9,7 @@ import { WfmIntelligencePanel } from './WfmIntelligencePanel';
 import { OperationConfigPanel } from './OperationConfigPanel';
 import { MonthNavigator } from './MonthNavigator';
 import { DEFAULT_OPERATION, getOperationalWeekIndex, getDayLabel, getMonthInfo, getMondaysInMonth, computeCapacity, generateIntelligentScale } from '../../utils/escala52Engine';
+import { getScenarioDetails } from '../../utils/scenarioConfig';
 
 interface CalendarGridProps {
   colaboradores: Colaborador[];
@@ -736,12 +737,13 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
             </td>
           );
         })}
-        {/* Collaborator days worked summary cell */}
-        <td className="p-0.5 text-center text-[9px] font-black bg-slate-100/30 dark:bg-slate-900/40 border-l border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400">
-          <div className="flex flex-col items-center">
-            <span>{diasTrabalhados}</span>
-            <span className="text-[6.5px] text-slate-400 font-normal">Dias</span>
-          </div>
+        {/* Collaborator days summary cell */}
+        <td className="p-0.5 text-center text-[9px] font-black bg-slate-100/30 dark:bg-slate-900/40 border-l border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300">
+          <span>{diasTrabalhados}d</span>
+        </td>
+        {/* Collaborator monthly hours summary cell */}
+        <td className="p-0.5 text-center text-[9px] font-black bg-blue-50/30 dark:bg-blue-950/20 border-l border-slate-200 dark:border-slate-800 text-blue-600 dark:text-blue-400">
+          <span>{Math.round(diasTrabalhados * ((params?.horasSemanais ?? 42) / 5))}h</span>
         </td>
       </tr>
     );
@@ -1157,7 +1159,7 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
                   </th>
                 );
               })}
-              <th className="p-1 text-center bg-slate-150 dark:bg-slate-900/80 border-l border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-200 font-black w-[80px] min-w-[80px] uppercase text-[9px]">
+              <th colSpan={2} className="p-1 text-center bg-slate-150 dark:bg-slate-900/80 border-l border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-200 font-black uppercase text-[9px]">
                 Resumo
               </th>
             </tr>
@@ -1207,239 +1209,558 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
                   </th>
                 );
               })}
-              <th className="p-1.5 text-center bg-slate-50 dark:bg-slate-900 text-slate-600 dark:text-slate-300 font-bold border-l border-slate-200 dark:border-slate-800 w-[80px] min-w-[80px] text-[9.5px]">
-                Total/Méd.
+              <th className="p-1.5 text-center bg-slate-50 dark:bg-slate-900 text-slate-600 dark:text-slate-300 font-bold border-l border-slate-200 dark:border-slate-800 w-[50px] min-w-[50px] text-[9px]">
+                Dias
+              </th>
+              <th className="p-1.5 text-center bg-blue-50/50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-300 font-bold border-l border-slate-200 dark:border-slate-800 w-[65px] min-w-[65px] text-[9px]">
+                Horas Mês
               </th>
             </tr>
           </thead>
-          
           <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-            {viewMode === 'grouped' ? (
-              (() => {
-                let lastShift = '';
-                return sortedGroups.map((group) => {
-                  const isCollapsed = collapsedGroups.includes(group.key);
-                  const currentShift = group.members[0]?.turno || '';
-                  const showShiftHeader = currentShift !== lastShift;
-                  lastShift = currentShift;
-                  return (
-                    <React.Fragment key={group.key}>
-                      {showShiftHeader && (
-                        <tr className="bg-slate-100/90 dark:bg-slate-800 border-y border-slate-350 dark:border-slate-700">
-                          <td colSpan={diasCount + 2} className="p-2 py-2.5 sticky left-0 z-20 font-black text-[10px] text-slate-850 dark:text-slate-100 uppercase tracking-widest bg-slate-150/70 dark:bg-slate-800 shadow-sm border-r border-slate-200 dark:border-slate-700">
-                            <div className="flex items-center gap-2">
-                              <span className={`w-2.5 h-2.5 rounded-full ${
-                                currentShift === 'T1' 
-                                  ? 'bg-emerald-500 shadow-emerald-500/50 shadow'
-                                  : currentShift === 'T2'
-                                    ? 'bg-amber-500 shadow-amber-500/50 shadow'
-                                    : 'bg-indigo-500 shadow-indigo-500/50 shadow'
-                              }`} />
-                              <span className="font-extrabold text-[10.5px] text-slate-800 dark:text-slate-200">{group.shiftLabel}</span>
-                            </div>
-                          </td>
-                        </tr>
-                      )}
-                    {/* Group Header Row */}
-                    <tr 
-                      className="bg-slate-50/50 dark:bg-slate-900/30 text-[9px] font-extrabold text-slate-600 dark:text-slate-300 transition select-none"
-                    >
-                      {isCollapsed ? (
-                        <>
-                          {/* Collapsed Header: First Cell with Chevron */}
-                          <td 
-                            onClick={() => toggleGroupCollapse(group.key)}
-                            className="p-1 sticky left-0 z-20 bg-slate-50 dark:bg-slate-900 border-r border-b border-slate-200 dark:border-slate-800 font-bold text-slate-800 dark:text-slate-200 shadow-sm cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 transition"
-                          >
-                            <div className="flex items-center gap-1.5 text-[9px] overflow-hidden">
-                              <ChevronRight className="w-3 h-3 text-slate-400 shrink-0" />
-                              <span className={`px-1.5 py-0.5 rounded font-black text-white text-[8.5px] shrink-0 ${
-                                currentShift === 'T1' 
-                                  ? 'bg-emerald-600 dark:bg-emerald-700'
-                                  : currentShift === 'T2'
-                                    ? 'bg-amber-600 dark:bg-amber-700'
-                                    : 'bg-indigo-600 dark:bg-indigo-700'
-                              }`}>
-                                {group.teamLabel}
-                              </span>
-                              <span className={`text-[7.5px] px-1 py-0.2 rounded font-black text-white uppercase shrink-0 ${
-                                group.members[0]?.turno === 'T1' 
-                                  ? 'bg-emerald-600'
-                                  : group.members[0]?.turno === 'T2'
-                                    ? 'bg-amber-600'
-                                    : 'bg-indigo-600'
-                              }`}>
-                                {group.members[0]?.turno}
-                              </span>
-                            </div>
-                          </td>
+            {['T3', 'T1', 'T2'].map((shift) => {
+              if (!selectedShifts.includes(shift)) return null;
 
-                          {/* Collapsed Header: Daily Counts */}
-                          {Array.from({ length: diasCount }).map((_, d) => {
-                            const count = group.members.filter(c => c.escala[d] === 'WORK').length;
-                            const dayOfWeek = (startDayOfWeek + d) % 7;
-                            const isSun = dayOfWeek === 6;
-                            const isSat = dayOfWeek === 5;
-                            const inGroupSel = isGroupCellInSelection(group.key, d);
-                            
-                            return (
-                              <td
-                                key={d}
-                                onMouseDown={(e) => {
-                                  e.stopPropagation();
-                                  handleGroupMouseDown(group.key, d, e);
-                                }}
-                                onMouseEnter={(e) => {
-                                  e.stopPropagation();
-                                  handleGroupMouseEnter(group.key, d);
-                                }}
-                                className={`p-0.5 text-center text-[9px] font-black bg-slate-50/20 dark:bg-slate-900/10 text-slate-700 dark:text-slate-300 border-b border-slate-200 dark:border-slate-800 select-none cursor-grab active:cursor-grabbing ${
-                                  inGroupSel ? 'ring-2 ring-blue-500 bg-blue-50 dark:bg-blue-950/40' : ''
-                                } ${
-                                  isSun 
-                                    ? 'border-r-2 border-slate-350 dark:border-slate-700' 
-                                    : isSat 
-                                      ? 'border-r border-slate-200 dark:border-slate-800' 
-                                      : 'border-r border-slate-200 dark:border-slate-800'
-                                }`}
-                              >
-                                <div className="flex justify-center relative">
-                                  {currentShift === 'T3' && count > 0 && (
-                                    <span 
-                                      className="absolute -left-[5px] top-1/2 -translate-y-1/2 text-orange-500 font-black text-[12px] pointer-events-none select-none leading-none"
-                                      title="Este turno (T3) inicia às 22:00 da noite anterior"
-                                    >
-                                      ←
+              const shiftGroups = sortedGroups.filter(g => g.key.startsWith(shift));
+              const shiftColaboradores = sortedColaboradoresConsolidated.filter(c => c.turno === shift);
+
+              const style = {
+                T1: { bg: 'bg-emerald-600 dark:bg-emerald-700', label: '1º TURNO (T1)', badge: 'Ativos T1', cap: 'Capac. T1', dem: 'Demand. T1', sal: 'Saldo T1', hc: 'Hc +/- T1', cob: 'Cobert. T1 %' },
+                T2: { bg: 'bg-amber-600 dark:bg-amber-700', label: '2º TURNO (T2)', badge: 'Ativos T2', cap: 'Capac. T2', dem: 'Demand. T2', sal: 'Saldo T2', hc: 'Hc +/- T2', cob: 'Cobert. T2 %' },
+                T3: { bg: 'bg-indigo-600 dark:bg-indigo-700', label: '3º TURNO (T3)', badge: 'Ativos T3', cap: 'Capac. T3', dem: 'Demand. T3', sal: 'Saldo T3', hc: 'Hc +/- T3', cob: 'Cobert. T3 %' },
+              }[shift as 'T1' | 'T2' | 'T3'];
+
+              const isShiftCollapsed = collapsedSummaryPanels.includes(shift);
+
+              return (
+                <React.Fragment key={shift}>
+                  {viewMode === 'grouped' ? (
+                    shiftGroups.map((group, groupIdx) => {
+                      const isCollapsed = collapsedGroups.includes(group.key);
+                      const currentShift = group.members[0]?.turno || '';
+                      const showShiftHeader = groupIdx === 0;
+                      // Horários reais do turno a partir do cenário configurado
+                      const scenarioDetails = getScenarioDetails(
+                        params?.horasSemanais ?? 42,
+                        params?.cenario ?? 'A'
+                      );
+                      const shiftTimes = currentShift === 'T1' ? scenarioDetails.t1
+                        : currentShift === 'T2' ? scenarioDetails.t2
+                        : scenarioDetails.t3;
+                      return (
+                        <React.Fragment key={group.key}>
+                          {showShiftHeader && (
+                            <tr className="bg-slate-100/90 dark:bg-slate-800 border-y border-slate-350 dark:border-slate-700">
+                              <td colSpan={diasCount + 3} className="p-2 py-2.5 sticky left-0 z-20 font-black text-[10px] text-slate-850 dark:text-slate-100 uppercase tracking-widest bg-slate-150/70 dark:bg-slate-800 shadow-sm border-r border-slate-200 dark:border-slate-700">
+                                <div className="flex items-center gap-2">
+                                  <span className={`w-2.5 h-2.5 rounded-full ${
+                                    currentShift === 'T1' 
+                                      ? 'bg-emerald-500 shadow-emerald-500/50 shadow'
+                                      : currentShift === 'T2'
+                                        ? 'bg-amber-500 shadow-amber-500/50 shadow'
+                                        : 'bg-indigo-500 shadow-indigo-500/50 shadow'
+                                  }`} />
+                                  <span className="font-extrabold text-[10.5px] text-slate-800 dark:text-slate-200">{group.shiftLabel}</span>
+                                  <span className="h-3 w-[1px] bg-slate-300 dark:bg-slate-600" />
+                                  <span className={`px-2 py-0.5 rounded-lg border text-[9.5px] flex items-center gap-1.5 whitespace-nowrap font-extrabold normal-case tracking-normal ${
+                                    currentShift === 'T1' 
+                                      ? 'bg-emerald-50 dark:bg-emerald-950/30 border-emerald-250 dark:border-emerald-900/40 text-emerald-700 dark:text-emerald-300'
+                                      : currentShift === 'T2'
+                                        ? 'bg-amber-50 dark:bg-amber-950/30 border-amber-250 dark:border-amber-900/40 text-amber-700 dark:text-amber-300'
+                                        : 'bg-indigo-50 dark:bg-indigo-950/30 border-indigo-250 dark:border-indigo-900/40 text-indigo-700 dark:text-indigo-300'
+                                  }`}>
+                                    <span>{shiftTimes.entrada} → {shiftTimes.saida}</span>
+                                    <span className="opacity-40">|</span>
+                                    <span className={`text-[8.5px] font-black ${
+                                      currentShift === 'T1' ? 'text-emerald-600 dark:text-emerald-400'
+                                      : currentShift === 'T2' ? 'text-amber-600 dark:text-amber-400'
+                                      : 'text-indigo-600 dark:text-indigo-400'
+                                    }`}>
+                                      {shiftTimes.jornada}
                                     </span>
-                                  )}
-                                  {count > 0 ? (
-                                    <span className={`w-[19px] h-[19px] rounded-full flex items-center justify-center font-black text-[9px] text-white shadow-sm ${
-                                      inGroupSel ? 'ring-2 ring-white scale-110' : ''
-                                    } ${
+                                  </span>
+                                </div>
+                              </td>
+                            </tr>
+                          )}
+                          {/* Group Header Row */}
+                          <tr className="bg-slate-50/50 dark:bg-slate-900/30 text-[9px] font-extrabold text-slate-600 dark:text-slate-300 transition select-none">
+                            {isCollapsed ? (
+                              <>
+                                {/* Collapsed Header: First Cell with Chevron */}
+                                <td 
+                                  onClick={() => toggleGroupCollapse(group.key)}
+                                  className="p-1 sticky left-0 z-20 bg-slate-50 dark:bg-slate-900 border-r border-b border-slate-200 dark:border-slate-800 font-bold text-slate-800 dark:text-slate-200 shadow-sm cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+                                >
+                                  <div className="flex items-center gap-1.5 text-[9px] overflow-hidden">
+                                    <ChevronRight className="w-3 h-3 text-slate-400 shrink-0" />
+                                    <span className={`px-1.5 py-0.5 rounded font-black text-white text-[8.5px] shrink-0 ${
                                       currentShift === 'T1' 
                                         ? 'bg-emerald-600 dark:bg-emerald-700'
                                         : currentShift === 'T2'
                                           ? 'bg-amber-600 dark:bg-amber-700'
                                           : 'bg-indigo-600 dark:bg-indigo-700'
                                     }`}>
-                                      {count}
+                                      {group.teamLabel}
                                     </span>
-                                  ) : (
-                                    <span className={`w-[19px] h-[19px] flex items-center justify-center text-slate-300 dark:text-slate-700 font-normal ${inGroupSel ? 'text-blue-500 font-bold' : ''}`}>
-                                      0
+                                    <span className={`text-[7.5px] px-1 py-0.2 rounded font-black text-white uppercase shrink-0 ${
+                                      group.members[0]?.turno === 'T1' 
+                                        ? 'bg-emerald-600'
+                                        : group.members[0]?.turno === 'T2'
+                                          ? 'bg-amber-600'
+                                          : 'bg-indigo-600'
+                                    }`}>
+                                      {group.members[0]?.turno}
                                     </span>
-                                  )}
-                                  {inGroupSel && d === dragGroupCurrentDay && (
-                                    <div className="absolute -top-7 left-1/2 -translate-x-1/2 z-30 bg-blue-600 text-white text-[8px] font-black px-1.5 py-0.5 rounded shadow-lg whitespace-nowrap pointer-events-none">
-                                      Aplicando em {group.members.length} colaboradores ({dragGroupAction === 'WORK' ? 'Trabalho' : 'Folga'})
-                                    </div>
-                                  )}
+                                  </div>
+                                </td>
+
+                                {/* Collapsed Header: Daily Counts */}
+                                {Array.from({ length: diasCount }).map((_, d) => {
+                                  const count = group.members.filter(c => c.escala[d] === 'WORK').length;
+                                  const dayOfWeek = (startDayOfWeek + d) % 7;
+                                  const isSun = dayOfWeek === 6;
+                                  const isSat = dayOfWeek === 5;
+                                  const inGroupSel = isGroupCellInSelection(group.key, d);
+                                  
+                                  return (
+                                    <td
+                                      key={d}
+                                      onMouseDown={(e) => {
+                                        e.stopPropagation();
+                                        handleGroupMouseDown(group.key, d, e);
+                                      }}
+                                      onMouseEnter={(e) => {
+                                        e.stopPropagation();
+                                        handleGroupMouseEnter(group.key, d);
+                                      }}
+                                      className={`p-0.5 text-center text-[9px] font-black bg-slate-50/20 dark:bg-slate-900/10 text-slate-700 dark:text-slate-300 border-b border-slate-200 dark:border-slate-800 select-none cursor-grab active:cursor-grabbing ${
+                                        inGroupSel ? 'ring-2 ring-blue-500 bg-blue-50 dark:bg-blue-950/40' : ''
+                                      } ${
+                                        isSun 
+                                          ? 'border-r-2 border-slate-350 dark:border-slate-700' 
+                                          : isSat 
+                                            ? 'border-r border-slate-200 dark:border-slate-800' 
+                                            : 'border-r border-slate-200 dark:border-slate-800'
+                                      }`}
+                                    >
+                                      <div className="flex justify-center relative">
+                                        {currentShift === 'T3' && count > 0 && (
+                                          <span 
+                                            className="absolute -left-[5px] top-1/2 -translate-y-1/2 text-orange-500 font-black text-[12px] pointer-events-none select-none leading-none"
+                                            title="Este turno (T3) inicia às 22:00 da noite anterior"
+                                          >
+                                            ←
+                                          </span>
+                                        )}
+                                        {count > 0 ? (
+                                          <span className={`w-[19px] h-[19px] rounded-full flex items-center justify-center font-black text-[9px] text-white shadow-sm ${
+                                            inGroupSel ? 'ring-2 ring-white scale-110' : ''
+                                          } ${
+                                            currentShift === 'T1' 
+                                              ? 'bg-emerald-600 dark:bg-emerald-700'
+                                              : currentShift === 'T2'
+                                                ? 'bg-amber-600 dark:bg-amber-700'
+                                                : 'bg-indigo-600 dark:bg-indigo-700'
+                                          }`}>
+                                            {count}
+                                          </span>
+                                        ) : (
+                                          <span className={`w-[19px] h-[19px] flex items-center justify-center text-slate-300 dark:text-slate-700 font-normal ${inGroupSel ? 'text-blue-500 font-bold' : ''}`}>
+                                            0
+                                          </span>
+                                        )}
+                                        {inGroupSel && d === dragGroupCurrentDay && (
+                                          <div className="absolute -top-7 left-1/2 -translate-x-1/2 z-30 bg-blue-600 text-white text-[8px] font-black px-1.5 py-0.5 rounded shadow-lg whitespace-nowrap pointer-events-none">
+                                            Aplicando em {group.members.length} colaboradores ({dragGroupAction === 'WORK' ? 'Trabalho' : 'Folga'})
+                                          </div>
+                                        )}
+                                      </div>
+                                    </td>
+                                  );
+                                })}
+
+                                  {/* Collapsed Header: Days Summary Cell */}
+                                  <td className="p-0.5 text-center text-[9px] font-black bg-slate-100/30 dark:bg-slate-900/40 border-l border-b border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-305">
+                                    <span>{group.members.length > 0 ? Math.round(group.members.reduce((acc, m) => acc + m.escala.filter(s => s === 'WORK').length, 0) / group.members.length) : 0}d</span>
+                                  </td>
+                                  {/* Collapsed Header: Hours Summary Cell */}
+                                  <td className="p-0.5 text-center text-[9px] font-black bg-blue-50/30 dark:bg-blue-950/20 border-l border-b border-slate-200 dark:border-slate-800 text-blue-600 dark:text-blue-400">
+                                    <span>{Math.round(group.members.reduce((acc, m) => acc + m.escala.filter(s => s === 'WORK').length, 0) * ((params?.horasSemanais ?? 42) / 5) / (group.members.length || 1))}h</span>
+                                  </td>
+                              </>
+                            ) : (
+                              /* Expanded Header: Single colSpan Cell */
+                              <td colSpan={diasCount + 3} className="p-1.5 px-3 border-y border-slate-200/60 dark:border-slate-800/80 ">
+                                <div 
+                                  onClick={() => toggleGroupCollapse(group.key)}
+                                  className="sticky left-3 z-10 flex items-center gap-2 cursor-pointer hover:opacity-80 transition"
+                                >
+                                  <ChevronDown className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                                  <span className="text-slate-800 dark:text-slate-200">{group.shiftLabel}</span>
+                                  <span className="h-3 w-[1px] bg-slate-300 dark:bg-slate-700"></span>
+                                  <span className={`px-1.5 py-0.5 rounded text-[8px] uppercase font-black text-white ${
+                                    currentShift === 'T1' 
+                                      ? 'bg-emerald-600 dark:bg-emerald-700'
+                                      : currentShift === 'T2'
+                                        ? 'bg-amber-600 dark:bg-amber-700'
+                                        : 'bg-indigo-600 dark:bg-indigo-700'
+                                  }`}>
+                                    {group.teamLabel}
+                                  </span>
+                                  <span className="text-slate-400 font-normal">({group.teamDesc})</span>
+                                  <span className="ml-auto text-slate-400 font-medium">{group.members.length} colaboradores</span>
                                 </div>
                               </td>
-                            );
-                          })}
+                            )}
+                          </tr>
 
-                          {/* Collapsed Header: Summary Cell */}
-                          <td className="p-0.5 text-center text-[9px] font-black bg-slate-100/30 dark:bg-slate-900/40 border-l border-b border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400">
-                            <div className="flex flex-col items-center">
-                              <span>{group.members.length}</span>
-                              <span className="text-[6.5px] text-slate-450 font-normal leading-none mt-0.5">Colab</span>
-                            </div>
-                          </td>
-                        </>
-                      ) : (
-                        /* Expanded Header: Single colSpan Cell */
-                        <td colSpan={diasCount + 2} className="p-1.5 px-3 border-y border-slate-200/60 dark:border-slate-800/80 ">
-                          <div 
-                            onClick={() => toggleGroupCollapse(group.key)}
-                            className="sticky left-3 z-10 flex items-center gap-2 cursor-pointer hover:opacity-80 transition"
-                          >
-                            <ChevronDown className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                            <span className="text-slate-800 dark:text-slate-200">{group.shiftLabel}</span>
-                            <span className="h-3 w-[1px] bg-slate-300 dark:bg-slate-700"></span>
-                            <span className={`px-1.5 py-0.5 rounded text-[8px] uppercase font-black text-white ${
-                              currentShift === 'T1' 
-                                ? 'bg-emerald-600 dark:bg-emerald-700'
-                                : currentShift === 'T2'
-                                  ? 'bg-amber-600 dark:bg-amber-700'
-                                  : 'bg-indigo-600 dark:bg-indigo-700'
-                            }`}>
-                              {group.teamLabel}
-                            </span>
-                            <span className="text-slate-400 font-normal">({group.teamDesc})</span>
-                            <span className="ml-auto text-slate-400 font-medium">{group.members.length} colaboradores</span>
+                          {/* Group Members Rows */}
+                          {!isCollapsed && group.members.map((colab) => renderColaboradorRow(colab))}
+                        </React.Fragment>
+                      );
+                    })
+                  ) : (
+                    <>
+                      {/* Consolidated Shift Header Row */}
+                      {(() => {
+                        const consolidatedScenario = getScenarioDetails(
+                          params?.horasSemanais ?? 42,
+                          params?.cenario ?? 'A'
+                        );
+                        const consolidatedTimes = shift === 'T1' ? consolidatedScenario.t1
+                          : shift === 'T2' ? consolidatedScenario.t2
+                          : consolidatedScenario.t3;
+                        return (
+                          <tr className="bg-slate-100/90 dark:bg-slate-800 border-y border-slate-350 dark:border-slate-700">
+                            <td colSpan={diasCount + 3} className="p-2 py-2.5 sticky left-0 z-20 font-black text-[10px] text-slate-850 dark:text-slate-100 uppercase tracking-widest bg-slate-150/70 dark:bg-slate-800 shadow-sm border-r border-slate-200 dark:border-slate-700">
+                              <div className="flex items-center gap-2">
+                                <span className={`w-2.5 h-2.5 rounded-full ${
+                                  shift === 'T1' ? 'bg-emerald-500 shadow shadow-emerald-500/50' : shift === 'T2' ? 'bg-amber-500 shadow shadow-amber-500/50' : 'bg-indigo-500 shadow shadow-indigo-500/50'
+                                }`} />
+                                <span className="font-extrabold text-[10.5px] text-slate-800 dark:text-slate-200">
+                                  {shift === 'T1' ? '1º Turno (T1)' : shift === 'T2' ? '2º Turno (T2)' : '3º Turno (T3)'}
+                                </span>
+                                <span className="h-3 w-[1px] bg-slate-300 dark:bg-slate-600" />
+                                <span className={`px-2 py-0.5 rounded-lg border text-[9.5px] flex items-center gap-1.5 whitespace-nowrap font-extrabold normal-case tracking-normal ${
+                                  shift === 'T1' 
+                                    ? 'bg-emerald-50 dark:bg-emerald-950/30 border-emerald-250 dark:border-emerald-900/40 text-emerald-700 dark:text-emerald-300'
+                                    : shift === 'T2'
+                                      ? 'bg-amber-50 dark:bg-amber-950/30 border-amber-250 dark:border-amber-900/40 text-amber-700 dark:text-amber-300'
+                                      : 'bg-indigo-50 dark:bg-indigo-950/30 border-indigo-250 dark:border-indigo-900/40 text-indigo-700 dark:text-indigo-300'
+                                }`}>
+                                  <span>{consolidatedTimes.entrada} → {consolidatedTimes.saida}</span>
+                                  <span className="opacity-40">|</span>
+                                  <span className={`text-[8.5px] font-black ${
+                                    shift === 'T1' ? 'text-emerald-600 dark:text-emerald-400'
+                                    : shift === 'T2' ? 'text-amber-600 dark:text-amber-400'
+                                    : 'text-indigo-600 dark:text-indigo-400'
+                                  }`}>
+                                    {consolidatedTimes.jornada}
+                                  </span>
+                                </span>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })()}
+                      {shiftColaboradores.map((colab) => renderColaboradorRow(colab))}
+                    </>
+                  )}
+
+                  {/* Visual Shift Totals Header */}
+                  <tr 
+                    onClick={() => toggleSummaryPanel(shift)}
+                    className="bg-slate-50 dark:bg-slate-950 text-[9px] font-extrabold border-t-2 border-slate-200 dark:border-slate-800 cursor-pointer select-none"
+                  >
+                    <td colSpan={diasCount + 3} className={`p-1.5 px-3 text-white ${style.bg} border-l-4 border-slate-800 shadow-sm`}>
+                      <span className="sticky left-3 z-10 flex items-center gap-1.5">
+                        {isShiftCollapsed ? (
+                          <ChevronRight className="w-3.5 h-3.5 text-white" />
+                        ) : (
+                          <ChevronDown className="w-3.5 h-3.5 text-white" />
+                        )}
+                        <span>PAINEL DE TOTAIS: {style.label}</span>
+                      </span>
+                    </td>
+                  </tr>
+                  {!isShiftCollapsed && (
+                    <>
+                      <tr className="hover:bg-slate-50/50 transition">
+                        <td className="p-1 sticky left-0 z-20 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 font-bold text-[9px] shadow-sm text-slate-700 dark:text-slate-300">
+                          {style.badge}
+                        </td>
+                        {Array.from({ length: diasCount }).map((_, d) => {
+                          const count = colaboradores.filter(c => c.turno === shift && c.escala[d] === 'WORK').length;
+                          const isSun = d % 7 === 6;
+                          const isSat = d % 7 === 5;
+                          return (
+                            <td
+                              key={d}
+                              className={`p-0.5 text-center text-[8px] font-black tracking-tighter whitespace-nowrap text-slate-700 dark:text-slate-300 ${
+                                isSun 
+                                  ? 'border-r-2 border-slate-300 dark:border-slate-700' 
+                                  : isSat
+                                    ? 'border-r border-slate-200 dark:border-slate-800'
+                                    : 'border-r border-slate-200 dark:border-slate-800'
+                              }`}
+                            >
+                              {count}
+                            </td>
+                          );
+                        })}
+                        {/* Summary Cell */}
+                        <td className="p-0.5 text-center text-[9px] font-bold bg-slate-50/40 dark:bg-slate-900/20 border-l border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300">
+                          <div className="flex flex-col items-center">
+                            <span>{Math.round(Array.from({ length: diasCount }).map((_, d) => colaboradores.filter(c => c.turno === shift && c.escala[d] === 'WORK').length).reduce((a, b) => a + b, 0) / diasCount)}</span>
+                            <span className="text-[6.5px] text-slate-455 font-normal">Média</span>
                           </div>
                         </td>
-                      )}
-                    </tr>
+                        <td className="p-0.5 bg-slate-50/40 dark:bg-slate-900/20 border-l border-slate-200 dark:border-slate-800"></td>
+                      </tr>
+                      <tr className="hover:bg-slate-50/50 transition">
+                        <td className="p-1 sticky left-0 z-20 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 font-bold text-[9px] shadow-sm text-slate-700 dark:text-slate-300">
+                          {style.cap}
+                        </td>
+                        {Array.from({ length: diasCount }).map((_, d) => {
+                          const count = colaboradores.filter(c => c.turno === shift && c.escala[d] === 'WORK').length;
+                          const isSun = d % 7 === 6;
+                          const isSat = d % 7 === 5;
+                          return (
+                            <td
+                              key={d}
+                              className={`p-0.5 text-center text-[8px] font-black tracking-tighter whitespace-nowrap text-slate-700 dark:text-slate-300 ${
+                                isSun 
+                                  ? 'border-r-2 border-slate-300 dark:border-slate-700' 
+                                  : isSat
+                                    ? 'border-r border-slate-200 dark:border-slate-800'
+                                    : 'border-r border-slate-200 dark:border-slate-800'
+                              }`}
+                            >
+                              {(count * prodRate).toLocaleString('pt-BR')}
+                            </td>
+                          );
+                        })}
+                        {/* Summary Cell */}
+                        <td className="p-0.5 text-center text-[9px] font-bold bg-slate-50/40 dark:bg-slate-900/20 border-l border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300">
+                          <div className="flex flex-col items-center">
+                            <span>{(Array.from({ length: diasCount }).map((_, d) => colaboradores.filter(c => c.turno === shift && c.escala[d] === 'WORK').length * prodRate).reduce((a, b) => a + b, 0)).toLocaleString('pt-BR')}</span>
+                            <span className="text-[6.5px] text-slate-455 font-normal">TT</span>
+                          </div>
+                        </td>
+                        <td className="p-0.5 bg-slate-50/40 dark:bg-slate-900/20 border-l border-slate-200 dark:border-slate-800"></td>
+                      </tr>
+                      <tr className="hover:bg-slate-50/50 transition">
+                        <td className="p-1 sticky left-0 z-20 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 font-bold text-[9px] shadow-sm text-slate-700 dark:text-slate-300">
+                          <div className="flex items-center justify-start gap-0.5 whitespace-nowrap">
+                            <span className="whitespace-nowrap text-[8.5px]">{style.dem}</span>
+                            <button
+                              onClick={() => {
+                                setImportDemandaActiveShift(shift as 'T1' | 'T2' | 'T3');
+                                setIsImportDemandaOpen(true);
+                              }}
+                              className="p-0.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded transition cursor-pointer text-violet-600 dark:text-violet-400"
+                              title={`Importar Demanda para o ${style.dem}`}
+                            >
+                              <FileSpreadsheet className="w-3 h-3" />
+                            </button>
+                          </div>
+                        </td>
+                        {Array.from({ length: diasCount }).map((_, d) => {
+                          const demand = (demandaDiaria[shift] && demandaDiaria[shift][d]) || 0;
+                          const isSun = d % 7 === 6;
+                          const isSat = d % 7 === 5;
+                          return (
+                            <td
+                              key={d}
+                              className={`p-0.5 text-center text-[9px] font-black ${
+                                isSun 
+                                  ? 'border-r-2 border-slate-300 dark:border-slate-700' 
+                                  : isSat
+                                    ? 'border-r border-slate-200 dark:border-slate-800'
+                                    : 'border-r border-slate-200 dark:border-slate-800'
+                              }`}
+                            >
+                              <input
+                                type="text"
+                                inputMode="numeric"
+                                pattern="[0-9]*"
+                                value={demand === 0 ? '' : demand}
+                                placeholder="0"
+                                onChange={(e) => {
+                                  const val = parseInt(e.target.value.replace(/\D/g, '')) || 0;
+                                  handleDemandaChange(shift, d, val);
+                                }}
+                                className="w-full text-center text-[8px] font-extrabold tracking-tighter bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded px-0.5 py-0.2 focus:outline-none focus:ring-1 focus:ring-slate-400"
+                              />
+                            </td>
+                          );
+                        })}
+                        {/* Summary Cell */}
+                        <td className="p-0.5 text-center text-[9px] font-bold bg-slate-50/40 dark:bg-slate-900/20 border-l border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300">
+                          <div className="flex flex-col items-center">
+                            <span>{((demandaDiaria[shift] || []).reduce((a, b) => a + b, 0)).toLocaleString('pt-BR')}</span>
+                            <span className="text-[6.5px] text-slate-455 font-normal">TT</span>
+                          </div>
+                        </td>
+                        <td className="p-0.5 bg-slate-50/40 dark:bg-slate-900/20 border-l border-slate-200 dark:border-slate-800"></td>
+                      </tr>
+                      <tr className="hover:bg-slate-50/50 transition">
+                        <td className="p-1 sticky left-0 z-20 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 font-bold text-[9px] shadow-sm text-slate-700 dark:text-slate-300">
+                          {style.sal}
+                        </td>
+                        {Array.from({ length: diasCount }).map((_, d) => {
+                          const count = colaboradores.filter(c => c.turno === shift && c.escala[d] === 'WORK').length;
+                          const cap = count * prodRate;
+                          const demand = (demandaDiaria[shift] && demandaDiaria[shift][d]) || 0;
+                          const diff = cap - demand;
+                          const isSun = d % 7 === 6;
+                          const isSat = d % 7 === 5;
+                          return (
+                            <td
+                              key={d}
+                              className={`p-0.5 text-center text-[8px] font-black tracking-tighter whitespace-nowrap ${
+                                isSun 
+                                  ? 'border-r-2 border-slate-300 dark:border-slate-700' 
+                                  : isSat
+                                    ? 'border-r border-slate-200 dark:border-slate-800'
+                                    : 'border-r border-slate-200 dark:border-slate-800'
+                              } ${diff >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500 dark:text-red-400'}`}
+                            >
+                              {diff > 0 ? `+${diff.toLocaleString('pt-BR')}` : diff.toLocaleString('pt-BR')}
+                            </td>
+                          );
+                        })}
+                        {/* Summary Cell */}
+                        <td className="p-0.5 text-center text-[9px] font-bold bg-slate-50/40 dark:bg-slate-900/20 border-l border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300">
+                          <div className="flex flex-col items-center">
+                            {(() => {
+                              const totalCap = Array.from({ length: diasCount }).map((_, d) => colaboradores.filter(c => c.turno === shift && c.escala[d] === 'WORK').length * prodRate).reduce((a, b) => a + b, 0);
+                              const totalDem = (demandaDiaria[shift] || []).reduce((a, b) => a + b, 0);
+                              const totalSal = totalCap - totalDem;
+                              return (
+                                <>
+                                  <span className={totalSal >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500 dark:text-red-400'}>
+                                    {totalSal > 0 ? `+${totalSal.toLocaleString('pt-BR')}` : totalSal.toLocaleString('pt-BR')}
+                                  </span>
+                                  <span className="text-[6.5px] text-slate-455 font-normal">SL TT</span>
+                                </>
+                              );
+                            })()}
+                          </div>
+                        </td>
+                        <td className="p-0.5 bg-slate-50/40 dark:bg-slate-900/20 border-l border-slate-200 dark:border-slate-800"></td>
+                      </tr>
+                      {/* HC +/- Row */}
+                      <tr className="bg-slate-50/20 dark:bg-slate-955/20 font-black border-b-2 border-slate-200 dark:border-slate-800 transition">
+                        <td className="p-1 sticky left-0 z-20 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 font-bold text-[9px] shadow-sm text-slate-700 dark:text-slate-300">
+                          {style.hc}
+                        </td>
+                        {Array.from({ length: diasCount }).map((_, d) => {
+                          const count = colaboradores.filter(c => c.turno === shift && c.escala[d] === 'WORK').length;
+                          const cap = count * prodRate;
+                          const demand = (demandaDiaria[shift] && demandaDiaria[shift][d]) || 0;
+                          const diff = cap - demand;
+                          const hcDiff = Math.round(diff / prodRate);
+                          const isSun = d % 7 === 6;
+                          const isSat = d % 7 === 5;
+                          return (
+                            <td
+                              key={d}
+                              className={`p-0.5 text-center text-[8px] font-black tracking-tighter whitespace-nowrap ${
+                                isSun 
+                                  ? 'border-r-2 border-slate-300 dark:border-slate-700 bg-slate-50/50' 
+                                  : isSat
+                                    ? 'border-r border-slate-200 dark:border-slate-800 bg-slate-50/50'
+                                    : 'border-r border-slate-200 dark:border-slate-800'
+                              } ${hcDiff >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500 dark:text-red-400'}`}
+                            >
+                              {hcDiff > 0 ? `+${hcDiff.toLocaleString('pt-BR')}` : hcDiff.toLocaleString('pt-BR')}
+                            </td>
+                          );
+                        })}
+                        {/* Summary Cell */}
+                        <td className="p-0.5 text-center text-[9px] font-bold bg-slate-50/40 dark:bg-slate-900/20 border-l border-slate-200 dark:border-slate-800 text-slate-750 dark:text-slate-300">
+                          <div className="flex flex-col items-center">
+                            {(() => {
+                              const totalCap = Array.from({ length: diasCount }).map((_, d) => colaboradores.filter(c => c.turno === shift && c.escala[d] === 'WORK').length * prodRate).reduce((a, b) => a + b, 0);
+                              const totalDem = (demandaDiaria[shift] || []).reduce((a, b) => a + b, 0);
+                              const totalSal = totalCap - totalDem;
+                              const avgHc = Math.round(totalSal / prodRate / diasCount);
+                              return (
+                                <>
+                                  <span className={avgHc >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500 dark:text-red-400'}>
+                                    {avgHc > 0 ? `+${avgHc.toLocaleString('pt-BR')}` : avgHc.toLocaleString('pt-BR')}
+                                  </span>
+                                  <span className="text-[6.5px] text-slate-455 font-normal">Média</span>
+                                </>
+                              );
+                            })()}
+                          </div>
+                        </td>
+                        <td className="p-0.5 bg-slate-50/40 dark:bg-slate-900/20 border-l border-slate-200 dark:border-slate-800"></td>
+                      </tr>
+                      {/* Cobertura % Row */}
+                      <tr className="bg-slate-50/40 dark:bg-slate-900/30 font-black border-b-2 border-slate-200 dark:border-slate-800 transition">
+                        <td className="p-1 sticky left-0 z-20 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 font-bold text-[9px] shadow-sm text-slate-700 dark:text-slate-300">
+                          {style.cob}
+                        </td>
+                        {Array.from({ length: diasCount }).map((_, d) => {
+                          const count = colaboradores.filter(c => c.turno === shift && c.escala[d] === 'WORK').length;
+                          const cap = count * prodRate;
+                          const demand = (demandaDiaria[shift] && demandaDiaria[shift][d]) || 0;
+                          const pct = demand > 0 ? Math.round((cap / demand) * 100) : (cap > 0 ? 100 : 0);
+                          const isSun = d % 7 === 6;
+                          const isSat = d % 7 === 5;
 
-                    {/* Group Members Rows */}
-                    {!isCollapsed && group.members.map((colab) => renderColaboradorRow(colab))}
-                  </React.Fragment>
-                );
-              });
-            })()
-          ) : (
-              sortedColaboradoresConsolidated.map((colab) => renderColaboradorRow(colab))
-            )}
+                          let colorClass = 'text-emerald-700 dark:text-emerald-350 bg-emerald-500/10 dark:bg-emerald-500/20';
+                          if (pct < 70) {
+                            colorClass = 'text-rose-700 dark:text-rose-350 bg-rose-500/20 dark:bg-rose-500/30';
+                          } else if (pct < 80) {
+                            colorClass = 'text-orange-700 dark:text-orange-350 bg-orange-500/15 dark:bg-orange-500/25';
+                          }
 
-            {/* Nível de Cobertura Diária Row */}
-            <tr className="bg-slate-50/50 dark:bg-slate-900/40 border-t-2 border-b border-slate-200 dark:border-slate-800 transition">
-              <td className="p-1 sticky left-0 z-20 bg-slate-50 dark:bg-slate-900 border-r border-b border-slate-200 dark:border-slate-800 font-black text-[8.5px] shadow-sm text-slate-700 dark:text-slate-300 uppercase tracking-wider whitespace-nowrap">
-                Cobertura %
-              </td>
-              {Array.from({ length: diasCount }).map((_, d) => {
-                const activeCount = filteredColaboradores.filter(c => c.escala[d] === 'WORK').length;
-                const totalColabs = filteredColaboradores.length;
-                const pct = totalColabs > 0 ? Math.round((activeCount / totalColabs) * 100) : 0;
-                
-                const isSun = d % 7 === 6;
-                const isSat = d % 7 === 5;
-                
-                // Color coding based on heatmap thresholds
-                let colorClass = 'text-emerald-700 dark:text-emerald-350 bg-emerald-500/10 dark:bg-emerald-500/20';
-                if (pct < 70) {
-                  colorClass = 'text-rose-700 dark:text-rose-350 bg-rose-500/20 dark:bg-rose-500/30';
-                } else if (pct < 80) {
-                  colorClass = 'text-orange-700 dark:text-orange-350 bg-orange-500/15 dark:bg-orange-500/25';
-                }
-                
-                return (
-                  <td
-                    key={d}
-                    className={`p-0.5 text-center text-[9px] font-black ${colorClass} ${
-                      isSun 
-                        ? 'border-r-2 border-slate-300 dark:border-slate-700' 
-                        : isSat
-                          ? 'border-r border-slate-200 dark:border-slate-800'
-                          : 'border-r border-slate-200 dark:border-slate-800'
-                    }`}
-                  >
-                    {pct}%
-                  </td>
-                );
-              })}
-              {/* Summary Cell */}
-              <td className="p-0.5 text-center text-[9px] font-bold bg-slate-50/40 dark:bg-slate-900/20 border-l border-b border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300">
-                <div className="flex flex-col items-center">
-                  {(() => {
-                    const avgPct = Math.round(
-                      Array.from({ length: diasCount }).reduce((acc: number, _, d) => {
-                        const activeCount = filteredColaboradores.filter(c => c.escala[d] === 'WORK').length;
-                        const pct = filteredColaboradores.length > 0 ? (activeCount / filteredColaboradores.length) * 100 : 0;
-                        return acc + pct;
-                      }, 0) / diasCount
-                    );
-                    return (
-                      <>
-                        <span className="font-extrabold text-[9px] text-slate-800 dark:text-slate-200">{avgPct}%</span>
-                        <span className="text-[6.5px] text-slate-450 font-normal">Média</span>
-                      </>
-                    );
-                  })()}
-                </div>
-              </td>
-            </tr>
+                          return (
+                            <td
+                              key={d}
+                              className={`p-0.5 text-center text-[8px] font-black tracking-tighter whitespace-nowrap ${
+                                isSun 
+                                  ? 'border-r-2 border-slate-300 dark:border-slate-700' 
+                                  : isSat
+                                    ? 'border-r border-slate-200 dark:border-slate-800'
+                                    : 'border-r border-slate-200 dark:border-slate-800'
+                              } ${colorClass}`}
+                            >
+                              {pct}%
+                            </td>
+                          );
+                        })}
+                        {/* Summary Cell */}
+                        <td className="p-0.5 text-center text-[9px] font-bold bg-slate-50/40 dark:bg-slate-900/20 border-l border-slate-200 dark:border-slate-800 text-slate-750 dark:text-slate-300">
+                          <div className="flex flex-col items-center">
+                            {(() => {
+                              const totalCap = Array.from({ length: diasCount }).map((_, d) => colaboradores.filter(c => c.turno === shift && c.escala[d] === 'WORK').length * prodRate).reduce((a, b) => a + b, 0);
+                              const totalDem = (demandaDiaria[shift] || []).reduce((a, b) => a + b, 0);
+                              const avgPct = totalDem > 0 ? Math.round((totalCap / totalDem) * 100) : 100;
+                              return (
+                                <>
+                                  <span className="font-extrabold text-[9px] text-slate-800 dark:text-slate-200">
+                                    {avgPct}%
+                                  </span>
+                                  <span className="text-[6.5px] text-slate-455 font-normal">Média</span>
+                                </>
+                              );
+                            })()}
+                          </div>
+                        </td>
+                        <td className="p-0.5 bg-slate-50/40 dark:bg-slate-900/20 border-l border-slate-200 dark:border-slate-800"></td>
+                      </tr>
+                    </>
+                  )}
+                </React.Fragment>
+              );
+            })}
+
 
             {/* Total Geral Summary Group */}
             {selectedShifts.length > 1 && (
@@ -1449,7 +1770,7 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
                   onClick={() => toggleSummaryPanel('CONSOLIDADO')}
                   className="bg-slate-50 dark:bg-slate-955 text-[9px] font-extrabold border-t-2 border-slate-200 dark:border-slate-800 cursor-pointer select-none"
                 >
-                  <td colSpan={diasCount + 2} className="p-1.5 px-3 text-white bg-slate-700 dark:bg-slate-800 border-l-4 border-slate-800 shadow-sm animate-none">
+                  <td colSpan={diasCount + 3} className="p-1.5 px-3 text-white bg-slate-700 dark:bg-slate-800 border-l-4 border-slate-800 shadow-sm animate-none">
                     <span className="sticky left-3 z-10 flex items-center gap-1.5">
                       {collapsedSummaryPanels.includes('CONSOLIDADO') ? (
                         <ChevronRight className="w-3.5 h-3.5 text-white" />
@@ -1623,7 +1944,7 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
                       </td>
                     );
                   })}
-                  {/* Summary Cell */}
+                   {/* Summary Cell */}
                   <td className="p-0.5 text-center text-[9px] font-bold bg-slate-50/40 dark:bg-slate-900/20 border-l border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300">
                     <div className="flex flex-col items-center">
                       {(() => {
@@ -1640,6 +1961,67 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
                           <>
                             <span className={avgHc >= 0 ? 'text-emerald-600 dark:text-emerald-455' : 'text-red-555 dark:text-red-455'}>
                               {avgHc > 0 ? `+${avgHc.toLocaleString('pt-BR')}` : avgHc.toLocaleString('pt-BR')}
+                            </span>
+                          </>
+                        );
+                      })()}
+                    </div>
+                  </td>
+                </tr>
+                {/* Cobertura % Geral Row */}
+                <tr className="bg-slate-50/40 dark:bg-slate-900/30 font-black border-b-2 border-slate-300 dark:border-slate-700 transition">
+                  <td className="p-1 sticky left-0 z-20 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 font-bold text-[9px] shadow-sm text-slate-700 dark:text-slate-300">
+                    Cobert. Geral %
+                  </td>
+                  {Array.from({ length: diasCount }).map((_, d) => {
+                    const count = colaboradores.filter(c => selectedShifts.includes(c.turno) && c.escala[d] === 'WORK').length;
+                    const cap = count * prodRate;
+                    let totalDemand = 0;
+                    selectedShifts.forEach(s => {
+                      totalDemand += (demandaDiaria[s] && demandaDiaria[s][d]) || 0;
+                    });
+                    const pct = totalDemand > 0 ? Math.round((cap / totalDemand) * 100) : (cap > 0 ? 100 : 0);
+                    const isSun = d % 7 === 6;
+                    const isSat = d % 7 === 5;
+
+                    let colorClass = 'text-emerald-700 dark:text-emerald-350 bg-emerald-500/10 dark:bg-emerald-500/20';
+                    if (pct < 70) {
+                      colorClass = 'text-rose-700 dark:text-rose-350 bg-rose-500/20 dark:bg-rose-500/30';
+                    } else if (pct < 80) {
+                      colorClass = 'text-orange-700 dark:text-orange-350 bg-orange-500/15 dark:bg-orange-500/25';
+                    }
+
+                    return (
+                      <td
+                        key={d}
+                        className={`p-0.5 text-center text-[8px] font-black tracking-tighter whitespace-nowrap ${
+                          isSun 
+                            ? 'border-r-2 border-slate-300 dark:border-slate-700' 
+                            : isSat
+                              ? 'border-r border-slate-200 dark:border-slate-800'
+                              : 'border-r border-slate-200 dark:border-slate-800'
+                        } ${colorClass}`}
+                      >
+                        {pct}%
+                      </td>
+                    );
+                  })}
+                  {/* Summary Cell */}
+                  <td className="p-0.5 text-center text-[9px] font-bold bg-slate-50/40 dark:bg-slate-900/20 border-l border-slate-200 dark:border-slate-800 text-slate-750 dark:text-slate-300">
+                    <div className="flex flex-col items-center">
+                      {(() => {
+                        const totalCap = Array.from({ length: diasCount }).map((_, d) => colaboradores.filter(c => selectedShifts.includes(c.turno) && c.escala[d] === 'WORK').length * prodRate).reduce((a, b) => a + b, 0);
+                        let grandDemand = 0;
+                        for (let d = 0; d < diasCount; d++) {
+                          selectedShifts.forEach(s => {
+                            grandDemand += (demandaDiaria[s] && demandaDiaria[s][d]) || 0;
+                          });
+                        }
+                        const avgPct = grandDemand > 0 ? Math.round((totalCap / grandDemand) * 100) : 100;
+                        return (
+                          <>
+                            <span className="font-extrabold text-[9px] text-slate-800 dark:text-slate-200">
+                              {avgPct}%
                             </span>
                           </>
                         );
@@ -1698,252 +2080,6 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
               </>
             )}
 
-            {/* Shift Summary Groups */}
-            {['T3', 'T1', 'T2'].map((shift) => {
-              if (!selectedShifts.includes(shift)) return null;
-
-              const style = {
-                T1: { bg: 'bg-emerald-600 dark:bg-emerald-700', label: '1º TURNO (T1)', badge: 'Ativos T1', cap: 'Capac. T1', dem: 'Demand. T1', sal: 'Saldo T1', hc: 'Hc +/- T1' },
-                T2: { bg: 'bg-amber-600 dark:bg-amber-700', label: '2º TURNO (T2)', badge: 'Ativos T2', cap: 'Capac. T2', dem: 'Demand. T2', sal: 'Saldo T2', hc: 'Hc +/- T2' },
-                T3: { bg: 'bg-indigo-600 dark:bg-indigo-700', label: '3º TURNO (T3)', badge: 'Ativos T3', cap: 'Capac. T3', dem: 'Demand. T3', sal: 'Saldo T3', hc: 'Hc +/- T3' },
-              }[shift as 'T1' | 'T2' | 'T3'];
-
-              const isCollapsed = collapsedSummaryPanels.includes(shift);
-
-              return (
-                <React.Fragment key={shift}>
-                  {/* Visual Shift Header */}
-                  <tr 
-                    onClick={() => toggleSummaryPanel(shift)}
-                    className="bg-slate-50 dark:bg-slate-950 text-[9px] font-extrabold border-t-2 border-slate-200 dark:border-slate-800 cursor-pointer select-none"
-                  >
-                    <td colSpan={diasCount + 2} className={`p-1.5 px-3 text-white ${style.bg} border-l-4 border-slate-800 shadow-sm`}>
-                      <span className="sticky left-3 z-10 flex items-center gap-1.5">
-                        {isCollapsed ? (
-                          <ChevronRight className="w-3.5 h-3.5 text-white" />
-                        ) : (
-                          <ChevronDown className="w-3.5 h-3.5 text-white" />
-                        )}
-                        <span>PAINEL DE TOTAIS: {style.label}</span>
-                      </span>
-                    </td>
-                  </tr>
-                  {!isCollapsed && (
-                    <>
-                      <tr className="hover:bg-slate-50/50 transition">
-                        <td className="p-1 sticky left-0 z-20 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 font-bold text-[9px] shadow-sm text-slate-700 dark:text-slate-300">
-                          {style.badge}
-                        </td>
-                        {Array.from({ length: diasCount }).map((_, d) => {
-                          const count = colaboradores.filter(c => c.turno === shift && c.escala[d] === 'WORK').length;
-                          const isSun = d % 7 === 6;
-                          const isSat = d % 7 === 5;
-                          return (
-                            <td
-                              key={d}
-                              className={`p-0.5 text-center text-[8px] font-black tracking-tighter whitespace-nowrap text-slate-700 dark:text-slate-300 ${
-                                isSun 
-                                  ? 'border-r-2 border-slate-300 dark:border-slate-700' 
-                                  : isSat
-                                    ? 'border-r border-slate-200 dark:border-slate-800'
-                                    : 'border-r border-slate-200 dark:border-slate-800'
-                              }`}
-                            >
-                              {count}
-                            </td>
-                          );
-                        })}
-                        {/* Summary Cell */}
-                        <td className="p-0.5 text-center text-[9px] font-bold bg-slate-50/40 dark:bg-slate-900/20 border-l border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300">
-                          <div className="flex flex-col items-center">
-                            <span>{Math.round(Array.from({ length: diasCount }).map((_, d) => colaboradores.filter(c => c.turno === shift && c.escala[d] === 'WORK').length).reduce((a, b) => a + b, 0) / diasCount)}</span>
-                            <span className="text-[6.5px] text-slate-400 font-normal">Média</span>
-                          </div>
-                        </td>
-                      </tr>
-                      <tr className="hover:bg-slate-50/50 transition">
-                        <td className="p-1 sticky left-0 z-20 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 font-bold text-[9px] shadow-sm text-slate-700 dark:text-slate-300">
-                          {style.cap}
-                        </td>
-                        {Array.from({ length: diasCount }).map((_, d) => {
-                          const count = colaboradores.filter(c => c.turno === shift && c.escala[d] === 'WORK').length;
-                          const isSun = d % 7 === 6;
-                          const isSat = d % 7 === 5;
-                          return (
-                            <td
-                              key={d}
-                              className={`p-0.5 text-center text-[8px] font-black tracking-tighter whitespace-nowrap text-slate-700 dark:text-slate-300 ${
-                                isSun 
-                                  ? 'border-r-2 border-slate-300 dark:border-slate-700' 
-                                  : isSat
-                                    ? 'border-r border-slate-200 dark:border-slate-800'
-                                    : 'border-r border-slate-200 dark:border-slate-800'
-                              }`}
-                            >
-                              {(count * prodRate).toLocaleString('pt-BR')}
-                            </td>
-                          );
-                        })}
-                        {/* Summary Cell */}
-                        <td className="p-0.5 text-center text-[9px] font-bold bg-slate-50/40 dark:bg-slate-900/20 border-l border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300">
-                          <div className="flex flex-col items-center">
-                            <span>{(Array.from({ length: diasCount }).map((_, d) => colaboradores.filter(c => c.turno === shift && c.escala[d] === 'WORK').length * prodRate).reduce((a, b) => a + b, 0)).toLocaleString('pt-BR')}</span>
-                            <span className="text-[6.5px] text-slate-400 font-normal">TT</span>
-                          </div>
-                        </td>
-                      </tr>
-                      <tr className="hover:bg-slate-50/50 transition">
-                        <td className="p-1 sticky left-0 z-20 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 font-bold text-[9px] shadow-sm text-slate-700 dark:text-slate-300">
-                          <div className="flex items-center justify-start gap-0.5 whitespace-nowrap">
-                            <span className="whitespace-nowrap text-[8.5px]">{style.dem}</span>
-                            <button
-                              onClick={() => {
-                                setImportDemandaActiveShift(shift as 'T1' | 'T2' | 'T3');
-                                setIsImportDemandaOpen(true);
-                              }}
-                              className="p-0.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded transition cursor-pointer text-violet-600 dark:text-violet-400"
-                              title={`Importar Demanda para o ${style.dem}`}
-                            >
-                              <FileSpreadsheet className="w-3 h-3" />
-                            </button>
-                          </div>
-                        </td>
-                        {Array.from({ length: diasCount }).map((_, d) => {
-                          const demand = (demandaDiaria[shift] && demandaDiaria[shift][d]) || 0;
-                          const isSun = d % 7 === 6;
-                          const isSat = d % 7 === 5;
-                          return (
-                            <td
-                              key={d}
-                              className={`p-0.5 text-center text-[9px] font-black ${
-                                isSun 
-                                  ? 'border-r-2 border-slate-300 dark:border-slate-700' 
-                                  : isSat
-                                    ? 'border-r border-slate-200 dark:border-slate-800'
-                                    : 'border-r border-slate-200 dark:border-slate-800'
-                              }`}
-                            >
-                              <input
-                                type="text"
-                                inputMode="numeric"
-                                pattern="[0-9]*"
-                                value={demand === 0 ? '' : demand}
-                                placeholder="0"
-                                onChange={(e) => {
-                                  const val = parseInt(e.target.value.replace(/\D/g, '')) || 0;
-                                  handleDemandaChange(shift, d, val);
-                                }}
-                                className="w-full text-center text-[8px] font-extrabold tracking-tighter bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded px-0.5 py-0.2 focus:outline-none focus:ring-1 focus:ring-slate-400"
-                              />
-                            </td>
-                          );
-                        })}
-                        {/* Summary Cell */}
-                        <td className="p-0.5 text-center text-[9px] font-bold bg-slate-50/40 dark:bg-slate-900/20 border-l border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300">
-                          <div className="flex flex-col items-center">
-                            <span>{((demandaDiaria[shift] || []).reduce((a, b) => a + b, 0)).toLocaleString('pt-BR')}</span>
-                            <span className="text-[6.5px] text-slate-400 font-normal">TT</span>
-                          </div>
-                        </td>
-                      </tr>
-                      <tr className="hover:bg-slate-50/50 transition">
-                        <td className="p-1 sticky left-0 z-20 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 font-bold text-[9px] shadow-sm text-slate-700 dark:text-slate-300">
-                          {style.sal}
-                        </td>
-                        {Array.from({ length: diasCount }).map((_, d) => {
-                          const count = colaboradores.filter(c => c.turno === shift && c.escala[d] === 'WORK').length;
-                          const cap = count * prodRate;
-                          const demand = (demandaDiaria[shift] && demandaDiaria[shift][d]) || 0;
-                          const diff = cap - demand;
-                          const isSun = d % 7 === 6;
-                          const isSat = d % 7 === 5;
-                          return (
-                            <td
-                              key={d}
-                              className={`p-0.5 text-center text-[8px] font-black tracking-tighter whitespace-nowrap ${
-                                isSun 
-                                  ? 'border-r-2 border-slate-300 dark:border-slate-700' 
-                                  : isSat
-                                    ? 'border-r border-slate-200 dark:border-slate-800'
-                                    : 'border-r border-slate-200 dark:border-slate-800'
-                              } ${diff >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500 dark:text-red-400'}`}
-                            >
-                              {diff > 0 ? `+${diff.toLocaleString('pt-BR')}` : diff.toLocaleString('pt-BR')}
-                            </td>
-                          );
-                        })}
-                        {/* Summary Cell */}
-                        <td className="p-0.5 text-center text-[9px] font-bold bg-slate-50/40 dark:bg-slate-900/20 border-l border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300">
-                          <div className="flex flex-col items-center">
-                            {(() => {
-                              const totalCap = Array.from({ length: diasCount }).map((_, d) => colaboradores.filter(c => c.turno === shift && c.escala[d] === 'WORK').length * prodRate).reduce((a, b) => a + b, 0);
-                              const totalDem = (demandaDiaria[shift] || []).reduce((a, b) => a + b, 0);
-                              const totalSal = totalCap - totalDem;
-                              return (
-                                <>
-                                  <span className={totalSal >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500 dark:text-red-400'}>
-                                    {totalSal > 0 ? `+${totalSal.toLocaleString('pt-BR')}` : totalSal.toLocaleString('pt-BR')}
-                                  </span>
-                                  <span className="text-[6.5px] text-slate-400 font-normal">SL TT</span>
-                                </>
-                              );
-                            })()}
-                          </div>
-                        </td>
-                      </tr>
-                      {/* HC +/- Row */}
-                      <tr className="bg-slate-50/20 dark:bg-slate-950/20 font-black border-b-2 border-slate-200 dark:border-slate-800 transition">
-                        <td className="p-1 sticky left-0 z-20 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 font-bold text-[9px] shadow-sm text-slate-700 dark:text-slate-300">
-                          {style.hc}
-                        </td>
-                        {Array.from({ length: diasCount }).map((_, d) => {
-                          const count = colaboradores.filter(c => c.turno === shift && c.escala[d] === 'WORK').length;
-                          const cap = count * prodRate;
-                          const demand = (demandaDiaria[shift] && demandaDiaria[shift][d]) || 0;
-                          const diff = cap - demand;
-                          const hcDiff = Math.round(diff / prodRate);
-                          const isSun = d % 7 === 6;
-                          const isSat = d % 7 === 5;
-                          return (
-                            <td
-                              key={d}
-                              className={`p-0.5 text-center text-[8px] font-black tracking-tighter whitespace-nowrap ${
-                                isSun 
-                                  ? 'border-r-2 border-slate-300 dark:border-slate-700 bg-slate-50/50' 
-                                  : isSat
-                                    ? 'border-r border-slate-200 dark:border-slate-800 bg-slate-50/50'
-                                    : 'border-r border-slate-200 dark:border-slate-800'
-                              } ${hcDiff >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500 dark:text-red-400'}`}
-                            >
-                              {hcDiff > 0 ? `+${hcDiff.toLocaleString('pt-BR')}` : hcDiff.toLocaleString('pt-BR')}
-                            </td>
-                          );
-                        })}
-                        {/* Summary Cell */}
-                        <td className="p-0.5 text-center text-[9px] font-bold bg-slate-50/40 dark:bg-slate-900/20 border-l border-slate-200 dark:border-slate-800 text-slate-750 dark:text-slate-300">
-                          <div className="flex flex-col items-center">
-                            {(() => {
-                              const totalCap = Array.from({ length: diasCount }).map((_, d) => colaboradores.filter(c => c.turno === shift && c.escala[d] === 'WORK').length * prodRate).reduce((a, b) => a + b, 0);
-                              const totalDem = (demandaDiaria[shift] || []).reduce((a, b) => a + b, 0);
-                              const totalSal = totalCap - totalDem;
-                              const avgHc = Math.round(totalSal / prodRate / diasCount);
-                              return (
-                                <>
-                                  <span className={avgHc >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500 dark:text-red-400'}>
-                                    {avgHc > 0 ? `+${avgHc.toLocaleString('pt-BR')}` : avgHc.toLocaleString('pt-BR')}
-                                  </span>
-                                  <span className="text-[6.5px] text-slate-400 font-normal">Média</span>
-                                </>
-                              );
-                            })()}
-                          </div>
-                        </td>
-                      </tr>
-                    </>
-                  )}
-                </React.Fragment>
-              );
-            })}
 
           </tbody>
         </table>

@@ -56,7 +56,7 @@ export const SCENARIO_MATRIX: Record<number, Record<'A' | 'B' | 'C' | 'D', Scena
       t3: { entrada: '22:00', saida: '06:24', permanencia: '8h24', jornada: '7h24 + 1h intervalo' },
       overlap1: '1h54',
       overlap2: '54 min',
-      gap: '0 min',
+      gap: '24 min sob.',
     },
     B: {
       t1: { entrada: '06:30', saida: '15:54', permanencia: '9h24', jornada: '8h24 + 1h intervalo' },
@@ -90,7 +90,7 @@ export const SCENARIO_MATRIX: Record<number, Record<'A' | 'B' | 'C' | 'D', Scena
       t3: { entrada: '22:00', saida: '06:48', permanencia: '8h48', jornada: '7h48 + 1h intervalo' },
       overlap1: '2h18',
       overlap2: '1h18',
-      gap: '0 min',
+      gap: '48 min sob.',
     },
     B: {
       t1: { entrada: '06:30', saida: '16:18', permanencia: '9h48', jornada: '8h48 + 1h intervalo' },
@@ -98,7 +98,7 @@ export const SCENARIO_MATRIX: Record<number, Record<'A' | 'B' | 'C' | 'D', Scena
       t3: { entrada: '22:00', saida: '06:48', permanencia: '8h48', jornada: '7h48 + 1h intervalo' },
       overlap1: '2h18',
       overlap2: '1h48',
-      gap: '0 min',
+      gap: '18 min sob.',
     },
     C: {
       t1: { entrada: '07:00', saida: '16:48', permanencia: '9h48', jornada: '8h48 + 1h intervalo' },

@@ -157,60 +157,89 @@ export const ShiftTimeline: React.FC<ShiftTimelineProps> = ({ horasSemanais, cen
         {/* Highlights / Overlaps annotation track */}
         <div className="relative h-12 mt-4 pl-20">
           {/* Overlap T1-T2 */}
-          {overlap1End > overlap1Start && (
-            <div
-              className="absolute top-0 h-8 border-l border-r border-dashed border-emerald-500/40 bg-emerald-500/5 dark:bg-emerald-400/5 text-center flex flex-col items-center justify-center rounded"
-              style={{ left: `${overlap1Start}%`, width: `${overlap1End - overlap1Start}%` }}
-            >
-              <span className="text-[9px] font-black text-emerald-600 dark:text-emerald-400">Sobreposição T1/T2</span>
-              <span className="text-[8px] text-slate-500">{details.t2.entrada} - {details.t1.saida} ({details.overlap1})</span>
-            </div>
-          )}
+          {overlap1End > overlap1Start && (() => {
+            const center = (overlap1Start + overlap1End) / 2;
+            return (
+              <div
+                className="absolute top-0 h-8 border border-dashed border-emerald-500/40 bg-emerald-500/5 dark:bg-emerald-400/5 text-center flex flex-col items-center justify-center rounded shadow-sm px-2"
+                style={{ left: `${center}%`, transform: 'translateX(-50%)', minWidth: '140px' }}
+              >
+                <span className="text-[9px] font-black text-emerald-600 dark:text-emerald-400 whitespace-nowrap">Sobreposição T1/T2</span>
+                <span className="text-[8px] text-slate-500 dark:text-slate-400 whitespace-nowrap font-bold">{details.t2.entrada} - {details.t1.saida} ({details.overlap1})</span>
+              </div>
+            );
+          })()}
 
           {/* Overlap T2-T3 */}
-          {overlap2End > overlap2Start && (
-            <div
-              className="absolute top-0 h-8 border-l border-r border-dashed border-orange-500/40 bg-orange-500/5 dark:bg-orange-400/5 text-center flex flex-col items-center justify-center rounded"
-              style={{ left: `${overlap2Start}%`, width: `${overlap2End - overlap2Start}%` }}
-            >
-              <span className="text-[9px] font-black text-orange-600 dark:text-orange-400">Sobreposição T2/T3</span>
-              <span className="text-[8px] text-slate-500">{details.t3.entrada} - {details.t2.saida} ({details.overlap2})</span>
-            </div>
-          )}
+          {overlap2End > overlap2Start && (() => {
+            const center = (overlap2Start + overlap2End) / 2;
+            return (
+              <div
+                className="absolute top-0 h-8 border border-dashed border-orange-500/40 bg-orange-500/5 dark:bg-orange-400/5 text-center flex flex-col items-center justify-center rounded shadow-sm px-2"
+                style={{ left: `${center}%`, transform: 'translateX(-50%)', minWidth: '140px' }}
+              >
+                <span className="text-[9px] font-black text-orange-600 dark:text-orange-400 whitespace-nowrap">Sobreposição T2/T3</span>
+                <span className="text-[8px] text-slate-500 dark:text-slate-400 whitespace-nowrap font-bold">{details.t3.entrada} - {details.t2.saida} ({details.overlap2})</span>
+              </div>
+            );
+          })()}
 
           {/* Gap T3-T1 */}
-          {gapEnd > gapStart && details.gap !== '0 min' && (
-            <div
-              className="absolute top-0 h-8 border-l border-r border-dashed border-purple-500/40 bg-purple-500/5 dark:bg-purple-400/5 text-center flex flex-col items-center justify-center rounded"
-              style={{ left: `${gapStart}%`, width: `${gapEnd - gapStart}%` }}
-            >
-              <span className="text-[8px] font-black text-purple-600 dark:text-purple-400">Janela</span>
-              <span className="text-[8px] text-slate-500">{details.gap}</span>
-            </div>
-          )}
+          {gapEnd > gapStart && details.gap !== '0 min' && (() => {
+            const center = (gapStart + gapEnd) / 2;
+            return (
+              <div
+                className="absolute top-0 h-8 border border-dashed border-purple-500/40 bg-purple-500/5 dark:bg-purple-400/5 text-center flex flex-col items-center justify-center rounded shadow-sm px-2"
+                style={{ left: `${center}%`, transform: 'translateX(-50%)', minWidth: '120px' }}
+              >
+                <span className="text-[9px] font-black text-purple-600 dark:text-purple-400 whitespace-nowrap">Janela Sem Turno</span>
+                <span className="text-[8px] text-slate-500 dark:text-slate-400 whitespace-nowrap font-bold">{details.gap}</span>
+              </div>
+            );
+          })()}
 
           {/* Overlap T3-T1 (for scenarios like D where T1 starts before T3 ends) */}
-          {t3End > t1Start && (
-            <div
-              className="absolute top-0 h-8 border-l border-r border-dashed border-indigo-500/40 bg-indigo-500/5 dark:bg-indigo-400/5 text-center flex flex-col items-center justify-center rounded"
-              style={{ left: `${t1Start}%`, width: `${t3End - t1Start}%` }}
-            >
-              <span className="text-[9px] font-black text-indigo-600 dark:text-indigo-400">Sobreposição T3/T1</span>
-              <span className="text-[8px] text-slate-500">{details.t1.entrada} - {details.t3.saida} ({details.gap.replace(' sob.', '')})</span>
-            </div>
-          )}
+          {t3End > t1Start && (() => {
+            const center = (t1Start + t3End) / 2;
+            return (
+              <div
+                className="absolute top-0 h-8 border border-dashed border-indigo-500/40 bg-indigo-500/5 dark:bg-indigo-400/5 text-center flex flex-col items-center justify-center rounded shadow-sm px-2"
+                style={{ left: `${center}%`, transform: 'translateX(-50%)', minWidth: '140px' }}
+              >
+                <span className="text-[9px] font-black text-indigo-600 dark:text-indigo-400 whitespace-nowrap">Sobreposição T3/T1</span>
+                <span className="text-[8px] text-slate-500 dark:text-slate-400 whitespace-nowrap font-bold">{details.t1.entrada} - {details.t3.saida} ({details.gap.replace(' sob.', '')})</span>
+              </div>
+            );
+          })()}
         </div>
       </div>
 
-      <div className="bg-slate-50 dark:bg-slate-950/40 border border-slate-100 dark:border-slate-900/60 p-4 rounded-2xl flex flex-col sm:flex-row gap-4 items-start text-xs text-slate-600 dark:text-slate-400">
-        <div className="flex items-center gap-2 font-semibold text-blue-600 dark:text-blue-400 mt-0.5">
-          <Info className="w-4 h-4 flex-shrink-0" />
-          <span>Informação de Escala:</span>
-        </div>
-        <p className="leading-relaxed flex-1">
-          As sobreposições de turnos (T1/T2 e T2/T3) fornecem <strong>capacidade operacional redobrada</strong> durante os horários críticos de pico (transição de equipe, recebimento vespertino, expedição de lotes e finalização de carregamento noturno). O gap de 6 minutos entre T3 e T1 representa a janela técnica de limpeza e transição de turnos matutina.
-        </p>
-      </div>
+      {/* Scale Information Box (Dynamic) */}
+      {(() => {
+        const isOverlapT3T1 = details.gap.includes('sob.');
+        const gapTime = details.gap.replace(' sob.', '');
+        
+        let t3t1Text = "";
+        if (isOverlapT3T1) {
+          t3t1Text = `Há também uma sobreposição operacional de ${gapTime} entre o T3 e o T1 (das ${details.t1.entrada} às ${details.t3.saida}), garantindo cobertura contínua e transição suave na entrada do turno matutino.`;
+        } else if (gapTime !== '0 min' && gapTime !== '0') {
+          t3t1Text = `O gap de ${gapTime} entre o T3 e o T1 (das ${details.t3.saida} às ${details.t1.entrada}) representa a janela técnica de limpeza e transição de turnos matutina.`;
+        } else {
+          t3t1Text = `A transição entre o T3 e o T1 ocorre de forma contínua às ${details.t1.entrada}, sem intervalo ou sobreposição entre os turnos.`;
+        }
+
+        return (
+          <div className="bg-slate-50 dark:bg-slate-950/40 border border-slate-100 dark:border-slate-900/60 p-4 rounded-2xl flex flex-col sm:flex-row gap-4 items-start text-xs text-slate-600 dark:text-slate-400">
+            <div className="flex items-center gap-2 font-semibold text-blue-600 dark:text-blue-400 mt-0.5 shrink-0">
+              <Info className="w-4 h-4" />
+              <span>Informação de Escala:</span>
+            </div>
+            <p className="leading-relaxed flex-1">
+              As sobreposições de turnos (T1/T2 e T2/T3) fornecem <strong>capacidade operacional redobrada</strong> de <strong>{details.overlap1}</strong> e <strong>{details.overlap2}</strong>, respectivamente, durante os horários críticos de pico (transição de equipe, recebimento vespertino, expedição de lotes e finalização de carregamento noturno). {t3t1Text}
+            </p>
+          </div>
+        );
+      })()}
     </div>
   );
 };

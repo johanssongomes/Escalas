@@ -6,6 +6,7 @@ import { generateIntelligentScale, buildCanonicalTeams, DEFAULT_OPERATION, getMo
 import type { ScheduleParams, Colaborador, TeamConfig, DayStatus, ShiftType, DadosMes, DadosMensais, OperationConfig, TeamLetter } from './types';
 import { ShieldCheck, Truck, Moon, Sun, Calendar, BarChart3, Upload } from 'lucide-react';
 import { ImportModal } from './components/Schedule/ImportModal';
+import { ScaleValidator } from './components/Schedule/ScaleValidator';
 
 import { ShiftCards } from './components/Schedule/ShiftCards';
 import { CompliancePanel } from './components/Schedule/CompliancePanel';
@@ -748,9 +749,52 @@ function App() {
       );
       setColaboradores(result.colaboradores);
       setTeams(result.teams);
+
+      // Regenera as escalas de TODOS os outros meses salvos no meses_data para propagar as regras de rotação
+      if (params.meses_data) {
+        const updatedMesesData = { ...params.meses_data };
+        let hasChanges = false;
+
+        Object.keys(updatedMesesData).forEach(key => {
+          const parts = key.split('_');
+          if (parts.length === 2) {
+            const m = parseInt(parts[0], 10);
+            const y = parseInt(parts[1], 10);
+
+            if (m !== params.month || y !== params.year) {
+              const oldColabs = updatedMesesData[key];
+              if (oldColabs && oldColabs.length > 0) {
+                const targetKey = mesKey(m, y);
+                const monthTeams = dadosMensais[targetKey]?.teams ?? teamsRef.current;
+
+                const monthResult = generateIntelligentScale(
+                  op,
+                  monthTeams,
+                  oldColabs,
+                  m,
+                  y,
+                  undefined,
+                  params.maxConsecutiveWorkDays,
+                  params.rotationSequence
+                );
+
+                updatedMesesData[key] = monthResult.colaboradores;
+                hasChanges = true;
+              }
+            }
+          }
+        });
+
+        if (hasChanges) {
+          setParams(prev => ({
+            ...prev,
+            meses_data: updatedMesesData
+          }));
+        }
+      }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [params.maxConsecutiveWorkDays, params.rotationSequence, isInitialLoadDone, params.month, params.year, params.operation]);
+  }, [params.maxConsecutiveWorkDays, params.rotationSequence, isInitialLoadDone, params.month, params.year, params.operation, dadosMensais]);
 
   // Run on initial mount or parameters change (only if not in manual mode)
   useEffect(() => {
@@ -883,7 +927,7 @@ function App() {
       <header className="magalu-header text-white py-6 px-6 sm:px-12 shadow-md relative overflow-hidden noprint">
         {/* Abstract background shape */}
         <div className="absolute right-0 top-0 w-96 h-96 bg-white/5 rounded-full blur-3xl transform translate-x-20 -translate-y-20"></div>
-        <div className="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="max-w-[95%] xl:max-w-[92%] 2xl:max-w-[1680px] mx-auto flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <div className="p-2.5 bg-white/10 rounded-2xl backdrop-blur-md border border-white/20">
               <Truck className="w-8 h-8 text-white" />
@@ -926,7 +970,7 @@ function App() {
       )}
 
       {/* Main Content Area */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-8 py-8 space-y-8">
+      <main className="max-w-[95%] xl:max-w-[92%] 2xl:max-w-[1680px] mx-auto px-4 sm:px-8 py-8 space-y-8">
         
         {/* Navigation Tabs */}
         <div className="flex border-b border-slate-200 dark:border-slate-800 gap-6 pb-px noprint">
@@ -1089,6 +1133,11 @@ function App() {
               {/* Divider */}
               <div className="border-t border-slate-200 dark:border-slate-800/80 my-4 noprint"></div>
 
+              {/* Timeline de sobreposições operacionais */}
+              <div className="noprint">
+                <ShiftTimeline horasSemanais={params.horasSemanais} cenario={params.cenario} />
+              </div>
+
               {/* Part 2: Interactive Grid */}
                <CalendarGrid key={`${params.month}_${params.year}`}
                  colaboradores={colaboradores} 
@@ -1123,6 +1172,15 @@ function App() {
                 activeScenarioId={activeScenarioId}
                 isScenarioDirty={isScenarioDirty}
                 onScenarioSaved={() => setIsScenarioDirty(false)}
+              />
+
+              <ScaleValidator 
+                colaboradores={colaboradores}
+                horasSemanais={params.horasSemanais}
+                setor={params.setor}
+                maxConsecutiveWorkDays={params.maxConsecutiveWorkDays}
+                month={params.month ?? 0}
+                year={params.year ?? 2026}
               />
             </section>
           </>

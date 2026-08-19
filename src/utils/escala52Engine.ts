@@ -211,8 +211,47 @@ export const CYCLE_OFF_DAYS_B: readonly [number, number][] = [
   [1, 2], // Step 3: T/Q (Ter/Qua)
 ];
 
-export function isCycleDayOff(step: number, dw: number, rotation: 'A' | 'B' = 'A'): boolean {
+/**
+ * Rotação C — Regra Osvaldo (Redução de Custo com Fretado/Alimentação)
+ *
+ * Convenção do calendário: o turno noturno é contabilizado pelo dia em que ele
+ * está ativo na maior parte / aparece na grade (não pelo dia de entrada).
+ *
+ * Padrão FIXO por turno, toda semana:
+ *   SÁBADO  → T1: WORK  | T2: OFF  | T3: WORK  (entrada sexta, turno conta como Sáb)
+ *   DOMINGO → T1: OFF   | T2: WORK | T3: OFF   (T3 não trabalha Sáb→Dom)
+ *
+ * T3 (noite): entrada sexta = turno contado no Sábado; folga Domingo (Sáb→Dom off).
+ * Dias Seg–Sex do T3 seguem a rotação A normal.
+ */
+export const OSVALDO_WEEKEND_RULE: Record<'T1' | 'T2' | 'T3', { sat: 'WORK' | 'OFF'; sun: 'WORK' | 'OFF' }> = {
+  T1: { sat: 'WORK', sun: 'OFF'  }, // Trabalha Sáb manhã, folga Dom
+  T2: { sat: 'OFF',  sun: 'WORK' }, // Folga Sáb tarde, trabalha Dom
+  T3: { sat: 'WORK', sun: 'OFF'  }, // Entrada sexta = WORK no Sáb; não trabalha Sáb→Dom (Dom OFF)
+};
+
+/**
+ * Pós-correção de fim de semana para Rotação C.
+ * Sobrescreve sábado (dw=5) e domingo (dw=6) para todos os turnos.
+ * Dias úteis (Seg–Sex) seguem a rotação A normal.
+ */
+export function applyOsvaldoWeekendRule(
+  escala: DayStatus[],
+  shift: ShiftType,
+  weekdays: number[], // dw (0=Seg…6=Dom) para cada dia d do mês
+): DayStatus[] {
+  const rule = OSVALDO_WEEKEND_RULE[shift];
+  return escala.map((status, d) => {
+    const dw = weekdays[d];
+    if (dw === 5) return rule.sat; // sábado
+    if (dw === 6) return rule.sun; // domingo
+    return status;                 // demais dias: rotação normal
+  });
+}
+
+export function isCycleDayOff(step: number, dw: number, rotation: 'A' | 'B' | 'C' = 'A'): boolean {
   const normStep = ((step % 4) + 4) % 4;
+  // Rotation C uses 'A' as weekday base — weekend overrides are applied by applyOsvaldoWeekendRule
   const cycle = rotation === 'B' ? CYCLE_OFF_DAYS_B : CYCLE_OFF_DAYS_A;
   const offDays = cycle[normStep];
   return offDays.includes(dw);
@@ -243,7 +282,7 @@ export function generateIntelligentScale(
   year: number,
   _demanda?: Partial<Record<ShiftType, number[]>>,
   maxConsecutiveWorkDays: number = 6,
-  rotationSequence: 'A' | 'B' = 'A',
+  rotationSequence: 'A' | 'B' | 'C' = 'A',
 ): EscalaGerada {
   const targetTeams = teams && teams.length > 0 ? teams : buildCanonicalTeams(operation);
   const { dias, startDayOfWeek } = getMonthInfo(year, month);
@@ -292,15 +331,71 @@ export function generateIntelligentScale(
       const letterIdx = Math.max(0, TEAM_LETTERS.indexOf(letter));
 
       for (const m of assigned[t.name]) {
-        const escala: DayStatus[] = [];
-        for (let d = 0; d < dias; d++) {
-          const currentDate = new Date(year, month, d + 1);
-          const absoluteWeek = getOperationalWeekIndex(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate());
-          const step = (letterIdx + absoluteWeek) % 4;
+          let escala: DayStatus[];
 
-          const dw = (startDayOfWeek + d) % 7;
-          escala.push(isCycleDayOff(step, dw, rotationSequence) ? 'OFF' : 'WORK');
-        }
+          if (rotationSequence === 'C') {
+            // Rotação C: gera base com Rotação A nos dias úteis.
+            const monthWeekdays = getMonthInfo(year, month).weekdays;
+            const baseEscala: DayStatus[] = [];
+            for (let d = 0; d < dias; d++) {
+              const currentDate = new Date(year, month, d + 1);
+              const absoluteWeek = getOperationalWeekIndex(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate());
+              const step = (letterIdx + absoluteWeek) % 4;
+              const dw = (startDayOfWeek + d) % 7;
+              baseEscala.push(isCycleDayOff(step, dw, 'A') ? 'OFF' : 'WORK');
+            }
+
+            if (shift === 'T2') {
+              // T2 — Sábado: sempre OFF para redução de fretado/alimentação.
+              // Domingo: rodízio rigorosamente alternado quinzenal (1x1) para garantir
+              // conformidade trabalhista (DSR feminino e limite do comércio/supermercado).
+              //
+              // ATENÇÃO — prevenção de 4 folgas consecutivas:
+              // Se o Domingo desta semana for OFF e a folga da semana útil cair no Step 1 (Qui+Sex),
+              // teríamos Qui+Sex+Sáb(fixo)+Dom(rodízio) = 4 folgas consecutivas.
+              // Para evitar isso sem forçar o Domingo para WORK (o que violaria a alternância do DSR),
+              // nós mudamos a folga da semana útil do Step 1 (Qui/Sex) para o Step 3 (Ter/Qua).
+              escala = [];
+              for (let d = 0; d < dias; d++) {
+                const currentDate = new Date(year, month, d + 1);
+                const absoluteWeek = getOperationalWeekIndex(
+                  currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate()
+                );
+                const dw = monthWeekdays[d];
+
+                if (dw === 5) {
+                  // Sábado: sempre OFF para o T2
+                  escala.push('OFF');
+                } else if (dw === 6) {
+                  // Domingo: rodízio alternado quinzenal
+                  // letterIdx par (A=0, C=2…) ↔ absoluteWeek par → WORK (e vice-versa)
+                  const isSundayWork = (letterIdx + absoluteWeek) % 2 === 0;
+                  escala.push(isSundayWork ? 'WORK' : 'OFF');
+                } else {
+                  // Dias úteis (Seg a Sex): segue Rotação A
+                  const isSundayOffThisWeek = (letterIdx + absoluteWeek) % 2 !== 0;
+                  const step = (letterIdx + absoluteWeek) % 4;
+
+                  // Se Domingo é folga e a folga cai em Qui/Sex (Step 1), redireciona folga para Ter/Qua (Step 3)
+                  const resolvedStep = (isSundayOffThisWeek && step === 1) ? 3 : step;
+                  const isOff = isCycleDayOff(resolvedStep, dw, 'A');
+                  escala.push(isOff ? 'OFF' : 'WORK');
+                }
+              }
+            } else {
+              // T1 e T3: aplica regra fixa Osvaldo (Sáb/Dom fixos por turno)
+              escala = applyOsvaldoWeekendRule(baseEscala, shift, monthWeekdays);
+            }
+          } else {
+            escala = [];
+            for (let d = 0; d < dias; d++) {
+              const currentDate = new Date(year, month, d + 1);
+              const absoluteWeek = getOperationalWeekIndex(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate());
+              const step = (letterIdx + absoluteWeek) % 4;
+              const dw = (startDayOfWeek + d) % 7;
+              escala.push(isCycleDayOff(step, dw, rotationSequence) ? 'OFF' : 'WORK');
+            }
+          }
         const withEscala: Colaborador = { ...m, team: t.name, escala };
         const correctedEscala = enforceMaxConsecutiveWorkDays(withEscala.escala, maxConsecutiveWorkDays);
         result.push({

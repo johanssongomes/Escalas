@@ -89,7 +89,7 @@ export interface ScheduleParams {
   meses_data?: Record<string, Colaborador[]>; // all months' colaboradores for global sync
   operation?: OperationConfig; // Escala 5x2 WFM operation configuration
   maxConsecutiveWorkDays?: number;
-  rotationSequence?: 'A' | 'B';
+  rotationSequence?: 'A' | 'B' | 'C';
 }
 
 // ─── Escala 5x2 / Workforce Management ─────────────────────────────────────────
