@@ -383,7 +383,7 @@ export const ParametersForm: React.FC<ParametersFormProps> = ({
               >
                 <option value="A">Rotação A (100% CLT Feminina - Folga Domingo 1x1)</option>
                 <option value="B">Rotação B (Operação Contínua - Folga Domingo 1x2)</option>
-                <option value="C">Rotação C (Osvaldo — Redução Custo FDS)</option>
+                <option value="C">Rotação C (Redução Custo FDS)</option>
               </select>
             </div>
 
@@ -393,7 +393,7 @@ export const ParametersForm: React.FC<ParametersFormProps> = ({
               
               const exp = rotation === 'C'
                 ? {
-                    title: 'Rotação C — Osvaldo (Redução FDS)',
+                    title: 'Rotação C (Redução Custo FDS)',
                     badge: 'Redução de Custo',
                     color: 'green' as const,
                     desc: `SÁBADO: T1 trabalha • T2 folga • T3 folga. DOMINGO: T1 folga • T2 trabalha • T3 trabalha. Menos turnos simultâneos no fim de semana reduz custo com fretado e alimentação. Dias úteis seguem rotação A.`,
