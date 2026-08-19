@@ -308,7 +308,7 @@ export const ParametersForm: React.FC<ParametersFormProps> = ({
                   <p className="text-[10px] text-slate-400 mt-0.5">Altere as sobreposições operacionais</p>
                 </div>
                 <div className="flex bg-slate-100 dark:bg-slate-950 p-1 rounded-xl border border-slate-200/50 dark:border-slate-850">
-                  {(['A', 'B', 'C', 'D'] as const).map((scen) => (
+                  {(['A', 'B', 'C', 'D', 'E'] as const).map((scen) => (
                     <button
                       key={scen}
                       type="button"
