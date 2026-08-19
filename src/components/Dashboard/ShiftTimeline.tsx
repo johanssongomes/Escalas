@@ -208,11 +208,11 @@ export const ShiftTimeline: React.FC<ShiftTimelineProps> = ({
           {hasOverlap1 && (() => {
             return (
               <div
-                className="absolute top-0 h-8 border border-dashed border-emerald-500/40 bg-emerald-500/5 dark:bg-emerald-400/5 text-center flex flex-col items-center justify-center rounded shadow-sm px-2"
-                style={{ left: `${overlap1Center}%`, transform: 'translateX(-50%)', minWidth: '140px' }}
+                className="absolute top-0 h-10 border border-dashed border-emerald-500/40 bg-emerald-500/5 dark:bg-emerald-400/5 text-center flex flex-col items-center justify-center rounded shadow-sm px-2.5"
+                style={{ left: `${overlap1Center}%`, transform: 'translateX(-50%)', minWidth: '150px' }}
               >
-                <span className="text-[9px] font-black text-emerald-600 dark:text-emerald-400 whitespace-nowrap">Sobreposição T1/T2</span>
-                <span className="text-[8px] text-slate-500 dark:text-slate-400 whitespace-nowrap font-bold">{details.t2.entrada} - {details.t1.saida} ({details.overlap1})</span>
+                <span className="text-[11px] font-black text-emerald-600 dark:text-emerald-400 whitespace-nowrap">Sobreposição T1/T2</span>
+                <span className="text-[10px] text-slate-600 dark:text-slate-300 whitespace-nowrap font-bold">{details.t2.entrada} - {details.t1.saida} ({details.overlap1})</span>
               </div>
             );
           })()}
@@ -221,11 +221,11 @@ export const ShiftTimeline: React.FC<ShiftTimelineProps> = ({
           {hasOverlap2 && (() => {
             return (
               <div
-                className="absolute top-0 h-8 border border-dashed border-orange-500/40 bg-orange-500/5 dark:bg-orange-400/5 text-center flex flex-col items-center justify-center rounded shadow-sm px-2"
-                style={{ left: `${overlap2Center}%`, transform: 'translateX(-50%)', minWidth: '140px' }}
+                className="absolute top-0 h-10 border border-dashed border-orange-500/40 bg-orange-500/5 dark:bg-orange-400/5 text-center flex flex-col items-center justify-center rounded shadow-sm px-2.5"
+                style={{ left: `${overlap2Center}%`, transform: 'translateX(-50%)', minWidth: '150px' }}
               >
-                <span className="text-[9px] font-black text-orange-600 dark:text-orange-400 whitespace-nowrap">Sobreposição T2/T3</span>
-                <span className="text-[8px] text-slate-500 dark:text-slate-400 whitespace-nowrap font-bold">{details.t3.entrada} - {details.t2.saida} ({details.overlap2})</span>
+                <span className="text-[11px] font-black text-orange-600 dark:text-orange-400 whitespace-nowrap">Sobreposição T2/T3</span>
+                <span className="text-[10px] text-slate-600 dark:text-slate-300 whitespace-nowrap font-bold">{details.t3.entrada} - {details.t2.saida} ({details.overlap2})</span>
               </div>
             );
           })()}
@@ -234,11 +234,11 @@ export const ShiftTimeline: React.FC<ShiftTimelineProps> = ({
           {hasGap3 && (() => {
             return (
               <div
-                className="absolute top-0 h-8 border border-dashed border-purple-500/40 bg-purple-500/5 dark:bg-purple-400/5 text-center flex flex-col items-center justify-center rounded shadow-sm px-2"
-                style={{ left: `${gapCenter}%`, transform: 'translateX(-50%)', minWidth: '120px' }}
+                className="absolute top-0 h-10 border border-dashed border-purple-500/40 bg-purple-500/5 dark:bg-purple-400/5 text-center flex flex-col items-center justify-center rounded shadow-sm px-2.5"
+                style={{ left: `${gapCenter}%`, transform: 'translateX(-50%)', minWidth: '130px' }}
               >
-                <span className="text-[9px] font-black text-purple-600 dark:text-purple-400 whitespace-nowrap">Janela Sem Turno</span>
-                <span className="text-[8px] text-slate-500 dark:text-slate-400 whitespace-nowrap font-bold">{details.gap}</span>
+                <span className="text-[11px] font-black text-purple-600 dark:text-purple-400 whitespace-nowrap">Janela Sem Turno</span>
+                <span className="text-[10px] text-slate-600 dark:text-slate-300 whitespace-nowrap font-bold">{details.gap}</span>
               </div>
             );
           })()}
@@ -247,11 +247,11 @@ export const ShiftTimeline: React.FC<ShiftTimelineProps> = ({
           {hasOverlap3 && (() => {
             return (
               <div
-                className="absolute top-0 h-8 border border-dashed border-indigo-500/40 bg-indigo-500/5 dark:bg-indigo-400/5 text-center flex flex-col items-center justify-center rounded shadow-sm px-2"
-                style={{ left: `${overlap3Center}%`, transform: 'translateX(-50%)', minWidth: '140px' }}
+                className="absolute top-0 h-10 border border-dashed border-indigo-500/40 bg-indigo-500/5 dark:bg-indigo-400/5 text-center flex flex-col items-center justify-center rounded shadow-sm px-2.5"
+                style={{ left: `${overlap3Center}%`, transform: 'translateX(-50%)', minWidth: '150px' }}
               >
-                <span className="text-[9px] font-black text-indigo-600 dark:text-indigo-400 whitespace-nowrap">Sobreposição T3/T1</span>
-                <span className="text-[8px] text-slate-500 dark:text-slate-400 whitespace-nowrap font-bold">{details.t1.entrada} - {details.t3.saida} ({details.gap.replace(' sob.', '')})</span>
+                <span className="text-[11px] font-black text-indigo-600 dark:text-indigo-400 whitespace-nowrap">Sobreposição T3/T1</span>
+                <span className="text-[10px] text-slate-600 dark:text-slate-300 whitespace-nowrap font-bold">{details.t1.entrada} - {details.t3.saida} ({details.gap.replace(' sob.', '')})</span>
               </div>
             );
           })()}
