@@ -47,6 +47,10 @@ export const ShiftCards: React.FC<ShiftCardsProps> = ({
       jornada: details.t3.jornada,
       cor: 'border-purple-500 bg-purple-50/30 text-purple-700 dark:bg-purple-950/20 dark:text-purple-400',
       observacao: 'Aplica Hora Noturna Reduzida (52m30s).',
+      overlapInfo: {
+        label: details.gap.includes('sob.') ? 'Sobreposição com T1' : 'Janela para T1',
+        value: details.gap.replace(' sob.', '')
+      }
     },
     {
       id: 'T1',
@@ -57,6 +61,10 @@ export const ShiftCards: React.FC<ShiftCardsProps> = ({
       jornada: details.t1.jornada,
       cor: 'border-emerald-500 bg-emerald-50/30 text-emerald-700 dark:bg-emerald-950/20 dark:text-emerald-400',
       observacao: 'Foco em recebimento e expedição matutina.',
+      overlapInfo: {
+        label: 'Sobreposição com T2',
+        value: details.overlap1
+      }
     },
     {
       id: 'T2',
@@ -67,6 +75,10 @@ export const ShiftCards: React.FC<ShiftCardsProps> = ({
       jornada: details.t2.jornada,
       cor: 'border-orange-500 bg-orange-50/30 text-orange-700 dark:bg-orange-950/20 dark:text-orange-400',
       observacao: 'Pico de expedição vespertina/noturna.',
+      overlapInfo: {
+        label: 'Sobreposição com T3',
+        value: details.overlap2
+      }
     },
   ];
 
@@ -121,10 +133,16 @@ export const ShiftCards: React.FC<ShiftCardsProps> = ({
                 <span>Permanência no CD:</span>
                 <span className="font-semibold">{shift.permanencia}</span>
               </div>
-              <div className="flex justify-between text-xs">
+              <div className="flex justify-between text-xs mb-1">
                 <span>Jornada Efetiva:</span>
                 <span className="font-semibold">{shift.jornada}</span>
               </div>
+              {shift.overlapInfo && (
+                <div className="flex justify-between text-xs mt-1.5 pt-1.5 border-t border-solid border-current/10 font-bold">
+                  <span>{shift.overlapInfo.label}:</span>
+                  <span className="opacity-95">{shift.overlapInfo.value}</span>
+                </div>
+              )}
             </div>
           </div>
 

@@ -11,6 +11,7 @@ export interface ShiftDefinition {
   jornada: string;
   cor: string;
   observacao?: string;
+  overlapInfo?: { label: string; value: string };
 }
 
 export interface TeamConfig {
