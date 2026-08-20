@@ -65,12 +65,17 @@ export const EscalaLookup: React.FC<EscalaLookupProps> = ({ colaboradores, param
 
   // Auto-select first collaborator if none selected
   useMemo(() => {
-    if (filteredColabs.length > 0 && (!selectedColabId || !filteredColabs.some(c => `${c.turno}-${c.id}` === selectedColabId))) {
-      setSelectedColabId(`${filteredColabs[0].turno}-${filteredColabs[0].id}`);
+    if (filteredColabs.length > 0 && (!selectedColabId || !filteredColabs.some((c, idx) => `${c.turno}-${c.id}-${idx}` === selectedColabId))) {
+      setSelectedColabId(`${filteredColabs[0].turno}-${filteredColabs[0].id}-0`);
     }
   }, [filteredColabs, selectedColabId]);
 
-  const selectedColab = colaboradores.find(c => `${c.turno}-${c.id}` === selectedColabId);
+  const selectedColab = useMemo(() => {
+    if (!selectedColabId) return null;
+    const found = filteredColabs.find((c, idx) => `${c.turno}-${c.id}-${idx}` === selectedColabId);
+    if (found) return found;
+    return colaboradores.find(c => `${c.turno}-${c.id}` === selectedColabId.split('-').slice(0, 2).join('-'));
+  }, [colaboradores, filteredColabs, selectedColabId]);
 
   // 2. Generate schedules for all 12 months for the selected year
   const projectedYearSchedules = useMemo(() => {
@@ -101,11 +106,11 @@ export const EscalaLookup: React.FC<EscalaLookupProps> = ({ colaboradores, param
 
   // Extract selected collaborator's schedules
   const colabSchedulesByMonth = useMemo(() => {
-    if (!selectedColabId) return [];
+    if (!selectedColab) return [];
     return projectedYearSchedules.map((monthColabs) => {
-      return monthColabs.find(c => `${c.turno}-${c.id}` === selectedColabId) || null;
+      return monthColabs.find(c => c.id === selectedColab.id && c.turno === selectedColab.turno) || null;
     });
-  }, [projectedYearSchedules, selectedColabId]);
+  }, [projectedYearSchedules, selectedColab]);
 
   // Stats calculation
   const stats = useMemo(() => {
@@ -313,19 +318,20 @@ export const EscalaLookup: React.FC<EscalaLookupProps> = ({ colaboradores, param
               {filteredColabs.length === 0 ? (
                 <p className="text-xs text-slate-400 text-center py-4">Nenhum colaborador encontrado</p>
               ) : (
-                filteredColabs.map((colab) => {
+                filteredColabs.map((colab, index) => {
                   const turnColorMap: Record<string, 'emerald' | 'amber' | 'violet'> = {
                     T1: 'emerald',
                     T2: 'amber',
                     T3: 'violet',
                   };
                   const color = teamColorOf(turnColorMap[colab.turno] || 'gray');
+                  const compoundKey = `${colab.turno}-${colab.id}-${index}`;
                   return (
                     <button
-                      key={`${colab.turno}-${colab.id}`}
-                      onClick={() => setSelectedColabId(`${colab.turno}-${colab.id}`)}
+                      key={compoundKey}
+                      onClick={() => setSelectedColabId(compoundKey)}
                       className={`w-full flex items-center gap-3 p-2 rounded-xl text-left transition text-xs font-bold border ${
-                        selectedColabId === `${colab.turno}-${colab.id}`
+                        selectedColabId === compoundKey
                           ? 'bg-blue-50/50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-900/50 text-blue-700 dark:text-blue-400'
                           : 'bg-transparent border-transparent hover:bg-slate-50 dark:hover:bg-slate-900 text-slate-600 dark:text-slate-300'
                       }`}
