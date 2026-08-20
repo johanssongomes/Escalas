@@ -225,125 +225,157 @@ export const ScaleValidator: React.FC<ScaleValidatorProps> = ({
   const rulesAtendidas = rules.length - totalViolations - totalWarnings;
 
   return (
-    <div className="bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 shadow-sm mt-8 print:hidden select-none">
+    <div className="bg-gradient-to-br from-white to-slate-50/50 dark:from-slate-900 dark:to-slate-950/60 text-slate-800 dark:text-slate-100 border border-slate-200/80 dark:border-slate-800/80 rounded-3xl p-6 shadow-md hover:shadow-lg transition-all duration-300 mt-8 print:hidden select-none">
       {/* Título */}
-      <div className="flex items-center gap-3 mb-6 pb-4 border-b border-slate-150 dark:border-slate-800/60">
-        <div className="p-2 bg-blue-50 dark:bg-blue-900/30 rounded-xl">
-          <Calendar className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+      <div className="flex items-center gap-3.5 mb-8 pb-5 border-b border-slate-200/60 dark:border-slate-800/60">
+        <div className="p-2.5 bg-gradient-to-tr from-blue-500 to-indigo-600 dark:from-blue-600 dark:to-indigo-700 rounded-2xl shadow-sm text-white">
+          <Calendar className="w-5 h-5" />
         </div>
         <div>
-          <h2 className="text-base font-extrabold tracking-wide uppercase text-slate-800 dark:text-slate-200">
-            TABELA RESUMO – VALIDAÇÃO DAS REGRAS DA ESCALA 5x2 | {horasSemanais}H SEMANAIS
+          <h2 className="text-sm md:text-base font-extrabold tracking-wider bg-gradient-to-r from-blue-600 to-indigo-600 dark:from-blue-400 dark:to-indigo-300 bg-clip-text text-transparent uppercase">
+            Painel de Auditoria e Validação Jurídica da Escala
           </h2>
+          <p className="text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mt-0.5">
+            Escala 5x2 • Jornada Semanal de {horasSemanais} Horas
+          </p>
         </div>
       </div>
 
       {/* Tabela de Regras */}
-      <div className="overflow-x-auto">
+      <div className="overflow-x-auto rounded-2xl border border-slate-200/50 dark:border-slate-800/60 bg-white/50 dark:bg-slate-950/20 backdrop-blur-sm">
         <table className="w-full text-left border-collapse">
           <thead>
-            <tr className="border-b border-slate-150 dark:border-slate-800/80 text-xs tracking-wider font-extrabold uppercase text-slate-500 dark:text-slate-400 bg-slate-50/50 dark:bg-slate-950/20">
-              <th className="py-3 px-4">Regra / Base Legal</th>
-              <th className="py-3 px-4">Exigência</th>
-              <th className="py-3 px-4 text-center">Status</th>
-              <th className="py-3 px-4">Como o App Garante / Diagnóstico</th>
+            <tr className="border-b border-slate-200 dark:border-slate-850/80 text-xs tracking-wider font-extrabold uppercase text-slate-500 dark:text-slate-400 bg-slate-50/70 dark:bg-slate-950/40">
+              <th className="py-3.5 px-5">Regra / Base Legal</th>
+              <th className="py-3.5 px-5">Exigência</th>
+              <th className="py-3.5 px-5 text-center">Status</th>
+              <th className="py-3.5 px-5">Como o App Garante / Diagnóstico</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100 dark:divide-slate-800/40 text-sm">
-            {rules.map((rule, idx) => (
-              <tr key={idx} className="hover:bg-slate-50/30 dark:hover:bg-slate-950/10 transition-colors">
-                <td className="py-3 px-4 flex items-center gap-3 font-semibold">
-                  {rule.icon}
-                  <div>
-                    <span className="block text-[13px] font-bold text-slate-800 dark:text-slate-200">{rule.name}</span>
-                    <span className="text-[10px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider">{rule.base}</span>
-                  </div>
-                </td>
-                <td className="py-3 px-4 text-[13px] font-bold text-slate-700 dark:text-slate-350">
-                  {rule.exigency}
-                </td>
-                <td className="py-3 px-4 text-center">
-                  {rule.isViolated ? (
-                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-red-550/10 dark:bg-red-500/10 border border-red-500/20 text-red-650 dark:text-red-400">
-                      <AlertCircle className="w-3.5 h-3.5" />
-                      VIOLAÇÃO
-                    </span>
-                  ) : rule.isWarning ? (
-                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-yellow-500/10 border border-yellow-500/20 text-yellow-650 dark:text-yellow-400">
-                      <AlertTriangle className="w-3.5 h-3.5" />
-                      ATENÇÃO
-                    </span>
-                  ) : (
-                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-550/10 dark:bg-emerald-500/10 border border-emerald-500/20 text-emerald-650 dark:text-emerald-400">
-                      <CheckCircle2 className="w-3.5 h-3.5" />
-                      100% CONFORME
-                    </span>
-                  )}
-                </td>
-                <td className="py-3 px-4 leading-relaxed max-w-md">
-                  {rule.isViolated || rule.isWarning ? (
-                    <span className={`text-[12.5px] font-bold ${rule.isViolated ? 'text-red-600 dark:text-red-400' : 'text-amber-600 dark:text-amber-400'}`}>
-                      {rule.errorMsg}
-                    </span>
-                  ) : (
-                    <span className="text-[12.5px] text-slate-600 dark:text-slate-300 font-semibold">
-                      {rule.garantia}
-                    </span>
-                  )}
-                </td>
-              </tr>
-            ))}
+          <tbody className="divide-y divide-slate-100 dark:divide-slate-850/40 text-sm">
+            {rules.map((rule, idx) => {
+              let rowBg = "hover:bg-slate-50/20 dark:hover:bg-slate-900/10";
+              if (rule.isViolated) {
+                rowBg = "bg-red-500/[0.02] hover:bg-red-500/[0.05] dark:bg-red-500/[0.01]";
+              } else if (rule.isWarning) {
+                rowBg = "bg-amber-500/[0.02] hover:bg-amber-500/[0.05] dark:bg-amber-500/[0.01]";
+              }
+
+              return (
+                <tr key={idx} className={`${rowBg} transition-colors duration-200`}>
+                  <td className="py-4 px-5 flex items-center gap-3.5 font-semibold text-slate-850 dark:text-slate-200">
+                    <div className={`p-2 rounded-xl shrink-0 ${
+                      rule.isViolated
+                        ? 'bg-red-50 dark:bg-red-950/30 text-red-500 border border-red-100 dark:border-red-900/30'
+                        : rule.isWarning
+                        ? 'bg-amber-50 dark:bg-amber-950/30 text-amber-500 border border-amber-100 dark:border-amber-900/30'
+                        : 'bg-slate-50 dark:bg-slate-800/40 text-slate-600 dark:text-slate-350 border border-slate-100 dark:border-slate-800/30'
+                    }`}>
+                      {rule.icon}
+                    </div>
+                    <div>
+                      <span className="block text-[13px] font-bold text-slate-850 dark:text-slate-200">{rule.name}</span>
+                      <span className="text-[9.5px] text-slate-400 dark:text-slate-500 font-extrabold uppercase tracking-wider">{rule.base}</span>
+                    </div>
+                  </td>
+                  <td className="py-4 px-5 text-[13px] font-bold text-slate-650 dark:text-slate-350">
+                    {rule.exigency}
+                  </td>
+                  <td className="py-4 px-5 text-center">
+                    {rule.isViolated ? (
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest bg-red-500/10 border border-red-500/20 text-red-650 dark:text-red-400 shadow-sm shadow-red-500/5">
+                        <AlertCircle className="w-3.5 h-3.5" />
+                        VIOLAÇÃO
+                      </span>
+                    ) : rule.isWarning ? (
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest bg-amber-500/10 border border-amber-500/20 text-amber-650 dark:text-amber-400 shadow-sm shadow-amber-500/5">
+                        <AlertTriangle className="w-3.5 h-3.5" />
+                        ATENÇÃO
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest bg-emerald-500/10 border border-emerald-500/20 text-emerald-650 dark:text-emerald-400 shadow-sm shadow-emerald-500/5">
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        CONFORME
+                      </span>
+                    )}
+                  </td>
+                  <td className="py-4 px-5 leading-relaxed max-w-md">
+                    {rule.isViolated || rule.isWarning ? (
+                      <span className={`text-[12.5px] font-bold ${rule.isViolated ? 'text-red-600 dark:text-red-400' : 'text-amber-600 dark:text-amber-400'}`}>
+                        {rule.errorMsg}
+                      </span>
+                    ) : (
+                      <span className="text-[12.5px] text-slate-655 dark:text-slate-350 font-semibold">
+                        {rule.garantia}
+                      </span>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
 
       {/* Painéis Inferiores */}
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 mt-6 pt-6 border-t border-slate-150 dark:border-slate-800">
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 mt-8 pt-6 border-t border-slate-200/60 dark:border-slate-800/80">
         
         {/* Bloco 1: Painel de Validação */}
-        <div className="bg-slate-50/50 dark:bg-slate-900/30 border border-slate-200/60 dark:border-slate-800/80 p-5 rounded-2xl flex flex-col justify-between">
+        <div className={`p-6 rounded-2xl border flex flex-col justify-between transition-all duration-300 ${
+          totalViolations > 0
+            ? 'bg-gradient-to-br from-red-500/[0.05] to-red-600/[0.02] border-red-500/20 dark:border-red-900/30'
+            : totalWarnings > 0
+            ? 'bg-gradient-to-br from-amber-500/[0.05] to-amber-600/[0.02] border-amber-500/20 dark:border-amber-900/30'
+            : 'bg-gradient-to-br from-emerald-500/[0.05] to-emerald-600/[0.02] border-emerald-500/20 dark:border-emerald-900/30'
+        }`}>
           <div>
-            <h3 className="text-[11px] font-black uppercase text-blue-600 dark:text-blue-400 tracking-wider mb-4">
-              PAINEL DE VALIDAÇÃO
+            <h3 className={`text-[11px] font-black tracking-wider uppercase mb-5 ${
+              totalViolations > 0
+                ? 'text-red-500 dark:text-red-400'
+                : totalWarnings > 0
+                ? 'text-amber-500 dark:text-amber-400'
+                : 'text-emerald-500 dark:text-emerald-400'
+            }`}>
+              Diagnóstico de Compliance
             </h3>
-            <div className="space-y-2 text-sm">
-              <div className="flex justify-between items-center py-1.5 border-b border-slate-100 dark:border-slate-800/50">
-                <span className="text-slate-550 dark:text-slate-400 font-semibold flex items-center gap-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+            <div className="space-y-3.5 text-[13px]">
+              <div className="flex justify-between items-center py-2 border-b border-slate-200/50 dark:border-slate-800/40">
+                <span className="text-slate-500 dark:text-slate-400 font-bold flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 ring-4 ring-emerald-500/20" />
                   Regras atendidas
                 </span>
-                <span className="font-black text-emerald-600 dark:text-emerald-400">{rulesAtendidas} / 9</span>
+                <span className="font-extrabold text-emerald-600 dark:text-emerald-400 text-sm">{rulesAtendidas} / 9</span>
               </div>
-              <div className="flex justify-between items-center py-1.5 border-b border-slate-100 dark:border-slate-800/50">
-                <span className="text-slate-550 dark:text-slate-400 font-semibold flex items-center gap-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-yellow-500" />
+              <div className="flex justify-between items-center py-2 border-b border-slate-200/50 dark:border-slate-800/40">
+                <span className="text-slate-500 dark:text-slate-400 font-bold flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-amber-500 ring-4 ring-amber-500/20" />
                   Atenções
                 </span>
-                <span className={`font-black ${totalWarnings > 0 ? 'text-yellow-600 dark:text-yellow-400' : 'text-slate-400 dark:text-slate-500'}`}>{totalWarnings}</span>
+                <span className={`font-extrabold text-sm ${totalWarnings > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-slate-400 dark:text-slate-500'}`}>{totalWarnings}</span>
               </div>
-              <div className="flex justify-between items-center py-1.5">
-                <span className="text-slate-550 dark:text-slate-400 font-semibold flex items-center gap-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
-                  Violações encontradas
+              <div className="flex justify-between items-center py-2">
+                <span className="text-slate-550 dark:text-slate-400 font-bold flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-red-500 ring-4 ring-red-500/20" />
+                  Violações
                 </span>
-                <span className={`font-black ${totalViolations > 0 ? 'text-red-600 dark:text-red-400' : 'text-slate-400 dark:text-slate-500'}`}>{totalViolations}</span>
+                <span className={`font-extrabold text-sm ${totalViolations > 0 ? 'text-red-650 dark:text-red-400' : 'text-slate-400 dark:text-slate-500'}`}>{totalViolations}</span>
               </div>
             </div>
           </div>
           
-          <div className="mt-5">
+          <div className="mt-6">
             {totalViolations > 0 ? (
-              <div className="w-full py-2.5 bg-red-500/10 border border-red-500/30 rounded-xl flex items-center justify-center gap-2 text-xs font-black uppercase tracking-wider text-red-600 dark:text-red-400">
+              <div className="w-full py-3 bg-red-500 text-white rounded-xl shadow-md shadow-red-500/10 flex items-center justify-center gap-2 text-xs font-black uppercase tracking-wider transition hover:brightness-105">
                 <AlertCircle className="w-4 h-4" />
                 ESCALA REPROVADA
               </div>
             ) : totalWarnings > 0 ? (
-              <div className="w-full py-2.5 bg-yellow-500/10 border border-yellow-500/30 rounded-xl flex items-center justify-center gap-2 text-xs font-black uppercase tracking-wider text-yellow-650 dark:text-yellow-400">
+              <div className="w-full py-3 bg-amber-500 text-white rounded-xl shadow-md shadow-amber-500/10 flex items-center justify-center gap-2 text-xs font-black uppercase tracking-wider transition hover:brightness-105">
                 <AlertTriangle className="w-4 h-4" />
                 ESCALA COM ALERTA
               </div>
             ) : (
-              <div className="w-full py-2.5 bg-emerald-500/10 border border-emerald-500/30 rounded-xl flex items-center justify-center gap-2 text-xs font-black uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
+              <div className="w-full py-3 bg-emerald-500 text-white rounded-xl shadow-md shadow-emerald-500/10 flex items-center justify-center gap-2 text-xs font-black uppercase tracking-wider transition hover:brightness-105">
                 <CheckCircle2 className="w-4 h-4" />
                 ESCALA APROVADA
               </div>
@@ -352,97 +384,97 @@ export const ScaleValidator: React.FC<ScaleValidatorProps> = ({
         </div>
 
         {/* Bloco 2: Resumo da Escala */}
-        <div className="lg:col-span-3 bg-slate-50/50 dark:bg-slate-900/30 border border-slate-200/60 dark:border-slate-800/80 p-5 rounded-2xl">
-          <h3 className="text-[11px] font-black uppercase text-blue-600 dark:text-blue-400 tracking-wider mb-4">
-            RESUMO DA ESCALA
+        <div className="lg:col-span-3 bg-slate-50/40 dark:bg-slate-900/10 border border-slate-200/50 dark:border-slate-800/80 p-5 rounded-2xl">
+          <h3 className="text-[11px] font-black uppercase text-blue-600 dark:text-blue-400 tracking-wider mb-5">
+            Parâmetros de Operação & Escala
           </h3>
           
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {/* Item 1 */}
-            <div className="bg-white dark:bg-slate-950/40 p-3.5 rounded-xl border border-slate-150 dark:border-slate-850/60 flex items-center gap-3">
-              <div className="p-2 bg-blue-50 dark:bg-blue-950/30 rounded-lg border border-blue-100 dark:border-blue-900/20 text-blue-600 dark:text-blue-400 shrink-0">
+            <div className="bg-white dark:bg-slate-950/40 p-4 rounded-xl border border-slate-200/60 dark:border-slate-800/50 flex items-center gap-3.5 hover:scale-[1.02] hover:border-blue-400 dark:hover:border-blue-700/60 transition-all duration-300">
+              <div className="p-2.5 bg-gradient-to-tr from-blue-500 to-indigo-500 rounded-xl text-white shadow-sm shrink-0">
                 <Clock className="w-4 h-4" />
               </div>
               <div>
-                <span className="block text-[10px] text-slate-400 dark:text-slate-500 uppercase font-black">Jornada Semanal</span>
-                <span className="text-base font-black text-slate-800 dark:text-slate-100">{horasSemanais}h00</span>
+                <span className="block text-[9px] text-slate-400 dark:text-slate-500 uppercase font-black tracking-wider">Jornada Semanal</span>
+                <span className="text-[15px] font-black text-slate-850 dark:text-slate-100">{horasSemanais}h00</span>
               </div>
             </div>
 
             {/* Item 2 */}
-            <div className="bg-white dark:bg-slate-950/40 p-3.5 rounded-xl border border-slate-150 dark:border-slate-850/60 flex items-center gap-3">
-              <div className="p-2 bg-purple-50 dark:bg-purple-950/30 rounded-lg border border-purple-100 dark:border-purple-900/20 text-purple-600 dark:text-purple-400 shrink-0">
+            <div className="bg-white dark:bg-slate-950/40 p-4 rounded-xl border border-slate-200/60 dark:border-slate-800/50 flex items-center gap-3.5 hover:scale-[1.02] hover:border-purple-400 dark:hover:border-purple-700/60 transition-all duration-300">
+              <div className="p-2.5 bg-gradient-to-tr from-purple-500 to-pink-500 rounded-xl text-white shadow-sm shrink-0">
                 <Calendar className="w-4 h-4" />
               </div>
               <div>
-                <span className="block text-[10px] text-slate-400 dark:text-slate-500 uppercase font-black">Regime</span>
-                <span className="text-base font-black text-slate-800 dark:text-slate-100">5x2</span>
+                <span className="block text-[9px] text-slate-400 dark:text-slate-500 uppercase font-black tracking-wider">Regime</span>
+                <span className="text-[15px] font-black text-slate-850 dark:text-slate-100">5x2</span>
               </div>
             </div>
 
             {/* Item 3 */}
-            <div className="bg-white dark:bg-slate-950/40 p-3.5 rounded-xl border border-slate-150 dark:border-slate-850/60 flex items-center gap-3">
-              <div className="p-2 bg-sky-50 dark:bg-sky-950/30 rounded-lg border border-sky-100 dark:border-sky-900/20 text-sky-600 dark:text-sky-400 shrink-0">
+            <div className="bg-white dark:bg-slate-950/40 p-4 rounded-xl border border-slate-200/60 dark:border-slate-800/50 flex items-center gap-3.5 hover:scale-[1.02] hover:border-sky-400 dark:hover:border-sky-700/60 transition-all duration-300">
+              <div className="p-2.5 bg-gradient-to-tr from-sky-450 to-blue-500 rounded-xl text-white shadow-sm shrink-0">
                 <Clock className="w-4 h-4" />
               </div>
               <div>
-                <span className="block text-[10px] text-slate-400 dark:text-slate-500 uppercase font-black">Jornada Diária</span>
-                <span className="text-base font-black text-slate-800 dark:text-slate-100">{dailyHours}</span>
+                <span className="block text-[9px] text-slate-400 dark:text-slate-500 uppercase font-black tracking-wider">Jornada Diária</span>
+                <span className="text-[15px] font-black text-slate-850 dark:text-slate-100">{dailyHours}</span>
               </div>
             </div>
 
             {/* Item 4 */}
-            <div className="bg-white dark:bg-slate-950/40 p-3.5 rounded-xl border border-slate-150 dark:border-slate-850/60 flex items-center gap-3">
-              <div className="p-2 bg-emerald-50 dark:bg-emerald-950/30 rounded-lg border border-emerald-100 dark:border-emerald-900/20 text-emerald-600 dark:text-emerald-400 shrink-0">
+            <div className="bg-white dark:bg-slate-950/40 p-4 rounded-xl border border-slate-200/60 dark:border-slate-800/50 flex items-center gap-3.5 hover:scale-[1.02] hover:border-emerald-400 dark:hover:border-emerald-700/60 transition-all duration-300">
+              <div className="p-2.5 bg-gradient-to-tr from-emerald-500 to-teal-500 rounded-xl text-white shadow-sm shrink-0">
                 <Calendar className="w-4 h-4" />
               </div>
               <div>
-                <span className="block text-[10px] text-slate-400 dark:text-slate-500 uppercase font-black">Folgas Semanais</span>
-                <span className="text-base font-black text-slate-800 dark:text-slate-100">2 dias</span>
+                <span className="block text-[9px] text-slate-400 dark:text-slate-500 uppercase font-black tracking-wider">Folgas Semanais</span>
+                <span className="text-[15px] font-black text-slate-850 dark:text-slate-100">2 dias</span>
               </div>
             </div>
 
             {/* Item 5 */}
-            <div className="bg-white dark:bg-slate-950/40 p-3.5 rounded-xl border border-slate-150 dark:border-slate-850/60 flex items-center gap-3">
-              <div className="p-2 bg-sky-50 dark:bg-sky-950/30 rounded-lg border border-sky-100 dark:border-sky-900/20 text-sky-600 dark:text-sky-400 shrink-0">
+            <div className="bg-white dark:bg-slate-950/40 p-4 rounded-xl border border-slate-200/60 dark:border-slate-800/50 flex items-center gap-3.5 hover:scale-[1.02] hover:border-indigo-400 dark:hover:border-indigo-700/60 transition-all duration-300">
+              <div className="p-2.5 bg-gradient-to-tr from-indigo-500 to-violet-500 rounded-xl text-white shadow-sm shrink-0">
                 <Clock className="w-4 h-4" />
               </div>
               <div>
-                <span className="block text-[10px] text-slate-400 dark:text-slate-500 uppercase font-black">Interjornada Mínima</span>
-                <span className="text-base font-black text-slate-800 dark:text-slate-100">11h</span>
+                <span className="block text-[9px] text-slate-400 dark:text-slate-500 uppercase font-black tracking-wider">Interjornada</span>
+                <span className="text-[15px] font-black text-slate-850 dark:text-slate-100">Mín. 11h</span>
               </div>
             </div>
 
             {/* Item 6 */}
-            <div className="bg-white dark:bg-slate-950/40 p-3.5 rounded-xl border border-slate-150 dark:border-slate-850/60 flex items-center gap-3">
-              <div className="p-2 bg-yellow-50 dark:bg-yellow-950/30 rounded-lg border border-yellow-100 dark:border-yellow-900/20 text-yellow-600 dark:text-yellow-400 shrink-0">
+            <div className="bg-white dark:bg-slate-950/40 p-4 rounded-xl border border-slate-200/60 dark:border-slate-800/50 flex items-center gap-3.5 hover:scale-[1.02] hover:border-amber-400 dark:hover:border-amber-700/60 transition-all duration-300">
+              <div className="p-2.5 bg-gradient-to-tr from-amber-500 to-orange-500 rounded-xl text-white shadow-sm shrink-0">
                 <Users className="w-4 h-4" />
               </div>
               <div>
-                <span className="block text-[10px] text-slate-400 dark:text-slate-500 uppercase font-black">Máx. Consecutivo</span>
-                <span className="text-base font-black text-slate-800 dark:text-slate-100">{maxConsecutiveWorkDays} dias</span>
+                <span className="block text-[9px] text-slate-400 dark:text-slate-500 uppercase font-black tracking-wider">Máx. Trabalhado</span>
+                <span className="text-[15px] font-black text-slate-850 dark:text-slate-100">{maxConsecutiveWorkDays} dias</span>
               </div>
             </div>
 
             {/* Item 7 */}
-            <div className="bg-white dark:bg-slate-950/40 p-3.5 rounded-xl border border-slate-150 dark:border-slate-850/60 flex items-center gap-3">
-              <div className="p-2 bg-amber-50 dark:bg-amber-950/30 rounded-lg border border-amber-100 dark:border-amber-900/20 text-amber-600 dark:text-amber-400 shrink-0">
+            <div className="bg-white dark:bg-slate-950/40 p-4 rounded-xl border border-slate-200/60 dark:border-slate-800/50 flex items-center gap-3.5 hover:scale-[1.02] hover:border-rose-400 dark:hover:border-rose-700/60 transition-all duration-300">
+              <div className="p-2.5 bg-gradient-to-tr from-rose-500 to-red-500 rounded-xl text-white shadow-sm shrink-0">
                 <Utensils className="w-4 h-4" />
               </div>
               <div>
-                <span className="block text-[10px] text-slate-400 dark:text-slate-500 uppercase font-black">Intervalo Intrajornada</span>
-                <span className="text-base font-black text-slate-800 dark:text-slate-100">1h</span>
+                <span className="block text-[9px] text-slate-400 dark:text-slate-500 uppercase font-black tracking-wider">Almoço</span>
+                <span className="text-[15px] font-black text-slate-850 dark:text-slate-100">1 hora</span>
               </div>
             </div>
 
             {/* Item 8 */}
-            <div className="bg-white dark:bg-slate-950/40 p-3.5 rounded-xl border border-slate-150 dark:border-slate-850/60 flex items-center gap-3">
-              <div className={`p-2 rounded-lg border shrink-0 ${
+            <div className="bg-white dark:bg-slate-950/40 p-4 rounded-xl border border-slate-200/60 dark:border-slate-800/50 flex items-center gap-3.5 hover:scale-[1.02] transition-all duration-300">
+              <div className={`p-2.5 rounded-xl shadow-sm text-white shrink-0 ${
                 totalViolations > 0 
-                  ? 'bg-red-50 dark:bg-red-950/30 border-red-100 dark:border-red-900/20 text-red-650 dark:text-red-400' 
+                  ? 'bg-gradient-to-tr from-red-500 to-rose-600' 
                   : totalWarnings > 0 
-                  ? 'bg-yellow-50 dark:bg-yellow-950/30 border-yellow-100 dark:border-yellow-900/20 text-yellow-600 dark:text-yellow-400' 
-                  : 'bg-emerald-50 dark:bg-emerald-950/30 border-emerald-100 dark:border-emerald-900/20 text-emerald-600 dark:text-emerald-400'
+                  ? 'bg-gradient-to-tr from-amber-500 to-orange-500' 
+                  : 'bg-gradient-to-tr from-emerald-500 to-teal-500'
               }`}>
                 {totalViolations > 0 ? (
                   <AlertCircle className="w-4 h-4" />
@@ -453,15 +485,15 @@ export const ScaleValidator: React.FC<ScaleValidatorProps> = ({
                 )}
               </div>
               <div>
-                <span className="block text-[10px] text-slate-400 dark:text-slate-500 uppercase font-black">Status Geral</span>
-                <span className={`text-base font-black uppercase tracking-wide ${
+                <span className="block text-[9px] text-slate-400 dark:text-slate-500 uppercase font-black tracking-wider">Status Geral</span>
+                <span className={`text-[15px] font-black uppercase tracking-wide ${
                   totalViolations > 0 
                     ? 'text-red-600 dark:text-red-400' 
                     : totalWarnings > 0 
-                    ? 'text-yellow-600 dark:text-yellow-400' 
+                    ? 'text-amber-600 dark:text-amber-400' 
                     : 'text-emerald-600 dark:text-emerald-400'
                 }`}>
-                  {totalViolations > 0 ? 'REPROVADO' : totalWarnings > 0 ? 'ATENÇÃO' : 'APROVADO'}
+                  {totalViolations > 0 ? 'REPROVADO' : totalWarnings > 0 ? 'ALERTA' : 'APROVADO'}
                 </span>
               </div>
             </div>
