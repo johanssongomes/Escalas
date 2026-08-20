@@ -65,12 +65,12 @@ export const EscalaLookup: React.FC<EscalaLookupProps> = ({ colaboradores, param
 
   // Auto-select first collaborator if none selected
   useMemo(() => {
-    if (filteredColabs.length > 0 && (!selectedColabId || !filteredColabs.some(c => c.id === selectedColabId))) {
-      setSelectedColabId(filteredColabs[0].id);
+    if (filteredColabs.length > 0 && (!selectedColabId || !filteredColabs.some(c => `${c.turno}-${c.id}` === selectedColabId))) {
+      setSelectedColabId(`${filteredColabs[0].turno}-${filteredColabs[0].id}`);
     }
   }, [filteredColabs, selectedColabId]);
 
-  const selectedColab = colaboradores.find(c => c.id === selectedColabId);
+  const selectedColab = colaboradores.find(c => `${c.turno}-${c.id}` === selectedColabId);
 
   // 2. Generate schedules for all 12 months for the selected year
   const projectedYearSchedules = useMemo(() => {
@@ -103,7 +103,7 @@ export const EscalaLookup: React.FC<EscalaLookupProps> = ({ colaboradores, param
   const colabSchedulesByMonth = useMemo(() => {
     if (!selectedColabId) return [];
     return projectedYearSchedules.map((monthColabs) => {
-      return monthColabs.find(c => c.id === selectedColabId) || null;
+      return monthColabs.find(c => `${c.turno}-${c.id}` === selectedColabId) || null;
     });
   }, [projectedYearSchedules, selectedColabId]);
 
@@ -322,10 +322,10 @@ export const EscalaLookup: React.FC<EscalaLookupProps> = ({ colaboradores, param
                   const color = teamColorOf(turnColorMap[colab.turno] || 'gray');
                   return (
                     <button
-                      key={colab.id}
-                      onClick={() => setSelectedColabId(colab.id)}
+                      key={`${colab.turno}-${colab.id}`}
+                      onClick={() => setSelectedColabId(`${colab.turno}-${colab.id}`)}
                       className={`w-full flex items-center gap-3 p-2 rounded-xl text-left transition text-xs font-bold border ${
-                        selectedColabId === colab.id
+                        selectedColabId === `${colab.turno}-${colab.id}`
                           ? 'bg-blue-50/50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-900/50 text-blue-700 dark:text-blue-400'
                           : 'bg-transparent border-transparent hover:bg-slate-50 dark:hover:bg-slate-900 text-slate-600 dark:text-slate-300'
                       }`}
