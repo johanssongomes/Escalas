@@ -392,8 +392,8 @@ export const ParametersForm: React.FC<ParametersFormProps> = ({
                 className="w-full text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-1.5 focus:ring-1 focus:ring-blue-500 font-bold"
                 {...register('maxConsecutiveWorkDays', { valueAsNumber: true })}
               >
-                <option value={5}>5 dias (Evita 6º dia de trabalho)</option>
-                <option value={6}>6 dias (Garante final de semana longo de 3 dias - Recomendado)</option>
+                <option value={5}>5 dias (Foco Ergonomia - Gera folgas extras e fins de semana de 3 dias no T2)</option>
+                <option value={6}>6 dias (Limite CLT - Garante escala 5x2 perfeita de 104 folgas/ano no T2 - Recomendado)</option>
               </select>
             </div>
 
