@@ -32,6 +32,8 @@ export const EscalaLookup: React.FC<EscalaLookupProps> = ({ colaboradores, param
   const [selectedColabId, setSelectedColabId] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'monthly' | 'yearly'>('monthly');
   const [activeMonthIndex, setActiveMonthIndex] = useState<number>(() => params.month ?? 8); // default to September (index 8)
+  const [startMonth, setStartMonth] = useState<number>(0); // default to January (index 0)
+  const [endMonth, setEndMonth] = useState<number>(11);    // default to December (index 11)
 
   // 1. Filtered collaborators list
   const filteredColabs = useMemo(() => {
@@ -147,6 +149,11 @@ export const EscalaLookup: React.FC<EscalaLookupProps> = ({ colaboradores, param
     const days = Array.from({ length: totalDays }, (_, i) => i + 1);
     const blankDays = Array.from({ length: jsStartOffset }, (_, i) => i);
 
+    // Calculate remaining slots to pad the grid to exactly 42 items (6 rows)
+    const totalSlots = jsStartOffset + totalDays;
+    const remainingSlots = 42 - totalSlots;
+    const endBlankDays = Array.from({ length: remainingSlots > 0 ? remainingSlots : 0 }, (_, i) => i);
+
     const weekdaysLabels = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 
     const turnColors: Record<string, string> = {
@@ -172,7 +179,7 @@ export const EscalaLookup: React.FC<EscalaLookupProps> = ({ colaboradores, param
 
         <div className="grid grid-cols-7 gap-1">
           {blankDays.map((_, i) => (
-            <div key={`blank-${i}`} className="h-6" />
+            <div key={`blank-start-${i}`} className="h-6" />
           ))}
 
           {days.map((day) => {
@@ -196,6 +203,10 @@ export const EscalaLookup: React.FC<EscalaLookupProps> = ({ colaboradores, param
               </div>
             );
           })}
+
+          {endBlankDays.map((_, i) => (
+            <div key={`blank-end-${i}`} className="h-6" />
+          ))}
         </div>
       </div>
     );
@@ -439,16 +450,55 @@ export const EscalaLookup: React.FC<EscalaLookupProps> = ({ colaboradores, param
                   )}
                 </div>
               ) : (
-                /* Yearly View: Responsive grid of all 12 mini calendars */
-                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-                  {colabSchedulesByMonth.map((monthSchedule, index) => {
-                    if (!monthSchedule) return null;
-                    return (
-                      <div key={index} className="print-no-break">
-                        {renderMonthCalendar(index, monthSchedule.escala)}
-                      </div>
-                    );
-                  })}
+                /* Yearly View: Responsive grid of all 12 mini calendars with range selection */
+                <div className="space-y-4">
+                  {/* Selectors for Start and End Month (noprint) */}
+                  <div className="flex flex-wrap items-center gap-4 bg-slate-50 dark:bg-slate-950 p-4 border border-slate-200/50 dark:border-slate-855 rounded-2xl select-none noprint">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold text-slate-500 dark:text-slate-400">Mês Inicial:</span>
+                      <select
+                        value={startMonth}
+                        onChange={(e) => {
+                          const val = Number(e.target.value);
+                          setStartMonth(val);
+                          if (val > endMonth) setEndMonth(val);
+                        }}
+                        className="text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-1.5 font-bold focus:ring-1 focus:ring-blue-500 cursor-pointer"
+                      >
+                        {MONTH_NAMES.map((name, i) => (
+                          <option key={i} value={i}>{name}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold text-slate-500 dark:text-slate-400">Mês Final:</span>
+                      <select
+                        value={endMonth}
+                        onChange={(e) => {
+                          const val = Number(e.target.value);
+                          setEndMonth(val);
+                          if (val < startMonth) setStartMonth(val);
+                        }}
+                        className="text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-1.5 font-bold focus:ring-1 focus:ring-blue-500 cursor-pointer"
+                      >
+                        {MONTH_NAMES.map((name, i) => (
+                          <option key={i} value={i} disabled={i < startMonth}>{name}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                    {colabSchedulesByMonth.map((monthSchedule, index) => {
+                      if (!monthSchedule || index < startMonth || index > endMonth) return null;
+                      return (
+                        <div key={index} className="print-no-break">
+                          {renderMonthCalendar(index, monthSchedule.escala)}
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               )}
             </>
