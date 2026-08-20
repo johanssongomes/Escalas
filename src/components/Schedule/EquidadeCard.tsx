@@ -76,7 +76,7 @@ export const EquidadeCard: React.FC<EquidadeCardProps> = ({ data, annualData, mo
       )}
 
       <div className="space-y-2">
-        {rows.filter(row => row.members > 0).map(row => {
+        {rows.filter(row => row.members > 0).map((row) => {
           const color = teamColorOf(LETTER_COLOR[row.letter]);
           const pctColor = row.percentualEquilibrio >= 85
             ? 'text-emerald-600 dark:text-emerald-400'
@@ -85,7 +85,7 @@ export const EquidadeCard: React.FC<EquidadeCardProps> = ({ data, annualData, mo
               : 'text-red-600 dark:text-red-400';
 
           return (
-            <div key={row.letter} className={`flex items-center gap-3 p-2 rounded-xl border transition ${row.alert ? 'border-red-200 dark:border-red-800 bg-red-50/40 dark:bg-red-950/10' : 'border-slate-100 dark:border-slate-800 bg-slate-50/40 dark:bg-slate-900/50'}`}>
+            <div key={`${viewMode}-${row.letter}`} className={`flex items-center gap-3 p-2 rounded-xl border transition ${row.alert ? 'border-red-200 dark:border-red-800 bg-red-50/40 dark:bg-red-950/10' : 'border-slate-100 dark:border-slate-800 bg-slate-50/40 dark:bg-slate-900/50'}`}>
               <div className={`w-3 h-3 rounded-full shrink-0 ${color.dot}`} />
               <span className={`text-[11px] font-extrabold flex-1 ${color.text}`}>
                 {row.label}

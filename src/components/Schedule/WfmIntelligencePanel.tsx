@@ -56,16 +56,25 @@ export const WfmIntelligencePanel: React.FC<WfmIntelligencePanelProps> = ({
   );
 
   const annualEquity: EquidadeResult = useMemo(() => {
-    const yearlyTeams = teams && teams.length > 0 ? teams : buildCanonicalTeams(operation);
+    const TEAM_LETTERS = ['A', 'B', 'C', 'D'] as const;
     const totals: Record<string, {
       finsDeSemanaCompletos: number;
       sabadosOff: number;
       domingosOff: number;
       members: number;
-    }> = {};
-    
-    yearlyTeams.forEach(t => {
-      totals[t.name] = { finsDeSemanaCompletos: 0, sabadosOff: 0, domingosOff: 0, members: t.memberCount };
+    }> = {
+      A: { finsDeSemanaCompletos: 0, sabadosOff: 0, domingosOff: 0, members: 0 },
+      B: { finsDeSemanaCompletos: 0, sabadosOff: 0, domingosOff: 0, members: 0 },
+      C: { finsDeSemanaCompletos: 0, sabadosOff: 0, domingosOff: 0, members: 0 },
+      D: { finsDeSemanaCompletos: 0, sabadosOff: 0, domingosOff: 0, members: 0 },
+    };
+
+    // Calculate members count for each team letter from the current active collaborators list
+    colaboradores.forEach(c => {
+      const letter = letterFromName(c.team);
+      if (totals[letter]) {
+        totals[letter].members++;
+      }
     });
 
     for (let m = 0; m < 12; m++) {
@@ -81,19 +90,20 @@ export const WfmIntelligencePanel: React.FC<WfmIntelligencePanelProps> = ({
       );
       const dist = computeDistribution(generated.colaboradores, generated.teams, m, year);
       dist.forEach(d => {
-        if (totals[d.teamName]) {
-          totals[d.teamName].finsDeSemanaCompletos += d.finsDeSemanaCompletos;
-          totals[d.teamName].sabadosOff += d.sabados;
-          totals[d.teamName].domingosOff += d.domingos;
+        const letter = letterFromName(d.teamName);
+        if (totals[letter]) {
+          totals[letter].finsDeSemanaCompletos += d.finsDeSemanaCompletos;
+          totals[letter].sabadosOff += d.sabados;
+          totals[letter].domingosOff += d.domingos;
         }
       });
     }
 
-    const rows = yearlyTeams.map(t => {
-      const tot = totals[t.name] || { finsDeSemanaCompletos: 0, sabadosOff: 0, domingosOff: 0, members: t.memberCount };
+    const rows = TEAM_LETTERS.map(letter => {
+      const tot = totals[letter];
       return {
-        letter: letterFromName(t.name),
-        label: t.name,
+        letter,
+        label: `Equipe ${letter}`,
         members: tot.members,
         finsDeSemanaCompletos: tot.finsDeSemanaCompletos,
         sabadosOff: tot.sabadosOff,
