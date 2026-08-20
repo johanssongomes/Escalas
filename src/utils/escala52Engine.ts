@@ -334,57 +334,55 @@ export function generateIntelligentScale(
           let escala: DayStatus[];
 
           if (rotationSequence === 'C') {
-            // Rotação C: gera base com Rotação A nos dias úteis.
-            const monthWeekdays = getMonthInfo(year, month).weekdays;
-            const baseEscala: DayStatus[] = [];
+            escala = [];
             for (let d = 0; d < dias; d++) {
               const currentDate = new Date(year, month, d + 1);
               const absoluteWeek = getOperationalWeekIndex(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate());
               const step = (letterIdx + absoluteWeek) % 4;
-              const dw = (startDayOfWeek + d) % 7;
-              baseEscala.push(isCycleDayOff(step, dw, 'A') ? 'OFF' : 'WORK');
-            }
+              const dw = (startDayOfWeek + d) % 7; // 0 = Mon, 1 = Tue, ..., 5 = Sat, 6 = Sun
 
-            if (shift === 'T2') {
-              // T2 — Sábado: sempre OFF para redução de fretado/alimentação.
-              // Domingo: rodízio rigorosamente alternado quinzenal (1x1) para garantir
-              // conformidade trabalhista (DSR feminino e limite do comércio/supermercado).
-              //
-              // ATENÇÃO — prevenção de 4 folgas consecutivas:
-              // Se o Domingo desta semana for OFF e a folga da semana útil cair no Step 1 (Qui+Sex),
-              // teríamos Qui+Sex+Sáb(fixo)+Dom(rodízio) = 4 folgas consecutivas.
-              // Para evitar isso sem forçar o Domingo para WORK (o que violaria a alternância do DSR),
-              // nós mudamos a folga da semana útil do Step 1 (Qui/Sex) para o Step 3 (Ter/Qua).
-              escala = [];
-              for (let d = 0; d < dias; d++) {
-                const currentDate = new Date(year, month, d + 1);
-                const absoluteWeek = getOperationalWeekIndex(
-                  currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate()
-                );
-                const dw = monthWeekdays[d];
-
+              if (shift === 'T1' || shift === 'T3') {
+                // T1 & T3: Domingo sempre OFF, Sábado sempre WORK.
+                // 1 folga adicional de Seg a Sáb conforme o Passo (step):
+                if (dw === 6) {
+                  // Domingo
+                  escala.push('OFF');
+                } else if (dw === 5) {
+                  // Sábado: sempre WORK, exceto se for Passo 2 (onde tem Sáb/Dom OFF)
+                  escala.push(step === 2 ? 'OFF' : 'WORK');
+                } else {
+                  // Segunda a Sexta: folga baseada no Passo
+                  let isOff = false;
+                  if (step === 0 && dw === 0) isOff = true; // Passo 0: folga Segunda
+                  if (step === 1 && dw === 3) isOff = true; // Passo 1: folga Quinta
+                  if (step === 3 && dw === 2) isOff = true; // Passo 3: folga Quarta
+                  escala.push(isOff ? 'OFF' : 'WORK');
+                }
+              } else {
+                // T2: Sábado sempre OFF.
                 if (dw === 5) {
-                  // Sábado: sempre OFF para o T2
+                  // Sábado
                   escala.push('OFF');
                 } else if (dw === 6) {
-                  // Domingo: rodízio alternado quinzenal
-                  // letterIdx par (A=0, C=2…) ↔ absoluteWeek par → WORK (e vice-versa)
+                  // Domingo: rodízio quinzenal
+                  // letterIdx par + absoluteWeek par -> WORK (e vice-versa)
                   const isSundayWork = (letterIdx + absoluteWeek) % 2 === 0;
                   escala.push(isSundayWork ? 'WORK' : 'OFF');
                 } else {
-                  // Dias úteis (Seg a Sex): segue Rotação A
+                  // Segunda a Sexta:
                   const isSundayOffThisWeek = (letterIdx + absoluteWeek) % 2 !== 0;
-                  const step = (letterIdx + absoluteWeek) % 4;
-
-                  // Se Domingo é folga e a folga cai em Qui/Sex (Step 1), redireciona folga para Ter/Qua (Step 3)
-                  const resolvedStep = (isSundayOffThisWeek && step === 1) ? 3 : step;
-                  const isOff = isCycleDayOff(resolvedStep, dw, 'A');
-                  escala.push(isOff ? 'OFF' : 'WORK');
+                  if (isSundayOffThisWeek) {
+                    // Já tem Sábado + Domingo OFF (2 folgas). Dias úteis são sempre WORK.
+                    escala.push('WORK');
+                  } else {
+                    // Domingo é WORK. Tem 1 folga (Sábado). Precisa de 1 folga na semana útil:
+                    let isOff = false;
+                    if (step === 0 && dw === 0) isOff = true; // Passo 0: folga Segunda
+                    if (step === 2 && dw === 2) isOff = true; // Passo 2: folga Quarta
+                    escala.push(isOff ? 'OFF' : 'WORK');
+                  }
                 }
               }
-            } else {
-              // T1 e T3: aplica regra fixa Osvaldo (Sáb/Dom fixos por turno)
-              escala = applyOsvaldoWeekendRule(baseEscala, shift, monthWeekdays);
             }
           } else {
             escala = [];
